@@ -73,12 +73,16 @@ runs:
             --pids-limit=128 \
             --cap-drop=ALL \
             --tmpfs /tmp:rw,noexec,nosuid,size=65536k \
+            --mount type=bind,source="${PWD}/.artifacts",target=/workspace/.artifacts \
             -e STRICT=1 \
             -e MATRIX="${HHFAB_MATRIX}" \
             -e MODE="strict" \
+            -e HHFAB_IMAGE="${image}" \
+            -e HHFAB_IMAGE_DIGEST="${image}" \
             -v "${PWD}:/workspace:ro" \
             "$image" \
             bash -c "cd /workspace && bash '$script'"
         else
-          STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" bash "$script"
+          STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" \
+          HHFAB_IMAGE="${HHFAB_IMAGE}" HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE}" bash "$script"
         fi

@@ -82,8 +82,7 @@ jobs:
             echo "summary missing" >&2
             exit 0
           fi
-          jq -c . "$p"
-          jq -rc '. + {strict:false, image:null}' "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always() && steps.run.outputs.summary_path != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -132,8 +131,7 @@ jobs:
             echo "summary missing" >&2
             exit 0
           fi
-          jq -c . "$p"
-          jq -rc --arg image "${HHFAB_IMAGE_DIGEST}" '. + {strict:true, image:$image}' "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
