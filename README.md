@@ -19,6 +19,15 @@ Run the validator locally (falls back to strict container in CI):
 MATRIX=$'samples/topology-min.yaml\nsamples/contract-min.json' bash scripts/hhfab-validate.sh || echo "local fallback"
 ```
 
+### Reproducing strict locally (no GH needed)
+
+```bash
+export HHFAB_IMAGE_DIGEST="ghcr.io/your-org/hhfab@sha256:..."
+docker run --rm --network=none --user 65532:65532 \
+  -v "$PWD:/w" -w /w "${HHFAB_IMAGE_DIGEST}" \
+  bash -lc 'set -Eeuo pipefail; hhfab version; bash scripts/hhfab-validate.sh'
+```
+
 The `review-kit` workflow executes two jobs:
 
 - `smoke-local` reuses any available `hhfab` binary on the runner, emits `.artifacts/review-kit/summary.json`, and is allowed to fail without blocking CI. 【F:.github/workflows/review-kit.yml†L23-L43】【F:scripts/hhfab-validate.sh†L1-L61】

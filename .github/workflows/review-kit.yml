@@ -7,6 +7,8 @@ on:
       - '.github/workflows/review-kit.yml'
       - 'contracts/**'
       - 'samples/**'
+  schedule:
+    - cron: '17 3 * * *'
 permissions:
   contents: read
 concurrency:
@@ -19,6 +21,8 @@ jobs:
     continue-on-error: true
     outputs:
       matrix: ${{ steps.read-matrix.outputs.matrix }}
+    env:
+      HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - id: read-matrix
@@ -32,7 +36,7 @@ jobs:
           sed -e '/^\s*#/d' -e '/^\s*$/d' .github/review-kit/matrix.txt >> "$GITHUB_OUTPUT"
           printf "EOF\n" >> "$GITHUB_OUTPUT"
       - name: Register hhfab matcher
-        run: echo "::add-matcher::.github/hhfab-problem-matcher.json"
+        run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Run local hhfab validator
         id: run
         uses: ./.github/actions/hhfab-validate
@@ -56,24 +60,28 @@ jobs:
   strict:
     needs: smoke-local
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+      HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Check hhfab image digest is set
         run: |
-          if [[ -z "${HHFAB_IMAGE_DIGEST}" ]]; then
-            echo "Set repo variable HHFAB_IMAGE_DIGEST to a digest-pinned image (ghcr.io/...@sha256:...)" >&2
+          if [[ -z "${HHFAB_IMAGE_DIGEST:-}" || "${HHFAB_IMAGE_DIGEST}" != *@sha256:* ]]; then
+            echo "Set repo variable HHFAB_IMAGE_DIGEST to a digest-pinned image ghcr.io/...@sha256:..." >&2
             exit 1
           fi
       - name: Register hhfab matcher
-        run: echo "::add-matcher::.github/hhfab-problem-matcher.json"
+        run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Run strict hhfab validator
         id: run
         uses: ./.github/actions/hhfab-validate
         with:
           mode: strict
           matrix: ${{ needs.smoke-local.outputs.matrix }}
+          use-container: 'true'
           container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
       - name: Remove hhfab matcher
         if: always()
@@ -88,7 +96,8 @@ jobs:
             echo "summary missing" >&2
             exit 0
           fi
-          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -c . "$p"
+          jq -rc --arg image "${HHFAB_IMAGE_DIGEST}" '. + {image:$image}' "$p" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

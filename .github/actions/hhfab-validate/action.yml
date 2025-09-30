@@ -18,6 +18,10 @@ inputs:
     description: Newline-separated list of sample files to validate (defaults inside script)
     required: false
     default: ""
+  use-container:
+    description: Set to 'true' to force container execution even if mode is local
+    required: false
+    default: 'false'
   container-image:
     description: Digest-pinned hhfab container image to use for strict mode runs
     required: false
@@ -32,6 +36,7 @@ runs:
         HHFAB_MODE: ${{ inputs.mode }}
         HHFAB_MATRIX: ${{ inputs.matrix }}
         HHFAB_IMAGE: ${{ inputs["container-image"] }}
+        HHFAB_USE_CONTAINER: ${{ inputs["use-container"] }}
         HHFAB_SCRIPT: ${{ inputs.script }}
       run: |
         set -Eeuo pipefail
@@ -41,7 +46,7 @@ runs:
         summary_file=.artifacts/review-kit/summary.json
         mkdir -p "$(dirname "$summary_file")"
 
-        if [[ "${HHFAB_MODE}" == "strict" ]]; then
+        if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
           image="${HHFAB_IMAGE}"
           if [[ "$image" != *@sha256:* ]]; then
             echo "ERROR: strict mode requires a digest-pinned container image (@sha256:)." >&2
