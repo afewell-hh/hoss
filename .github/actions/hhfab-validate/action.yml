@@ -1,0 +1,25 @@
+name: hhfab validate (stub)
+description: Minimal stub that runs scripts/hhfab-smoke.sh and emits a JSON summary.
+author: HOSS Automation
+inputs:
+  script:
+    description: Relative path to smoke script
+    required: false
+    default: scripts/hhfab-smoke.sh
+  working-directory:
+    description: Repo subdir to run in
+    required: false
+    default: .
+runs:
+  using: composite
+  steps:
+    - name: Run smoke
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -Eeuo pipefail
+        script="${{ inputs.script }}"
+        if [[ ! -x "$script" ]]; then chmod +x "$script"; fi
+        bash "$script"
+        # Surface path for downstream steps
+        echo "summary_path=$(jq -r '.artifact' .artifacts/review-kit/summary.json 2>/dev/null || echo .artifacts/review-kit/summary.json)" >> "$GITHUB_OUTPUT"

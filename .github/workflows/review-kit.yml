@@ -1,0 +1,33 @@
+name: review-kit
+on:
+  pull_request:
+    paths:
+      - 'scripts/**'
+      - '.github/actions/**'
+      - '.github/workflows/review-kit.yml'
+      - 'contracts/**'
+      - 'samples/**'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Run minimal validator stub
+        id: run
+        uses: ./.github/actions/hhfab-validate
+      - name: Print summary
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p=".artifacts/review-kit/summary.json"
+          test -f "$p" || { echo "summary missing ($p)"; exit 0; }
+          echo "----- summary.json -----"
+          cat "$p" | sed 's/.*/ &/'
+          echo "------------------------"

@@ -1,0 +1,29 @@
+name: actionlint
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Set up Go (for actionlint)
+        uses: actions/setup-go@4d1edbf9f77cb1be1dfc84a3aa6bce4a0e753135
+        with:
+          go-version: '1.21'
+      - name: Install actionlint
+        run: |
+          set -Eeuo pipefail
+          export GOBIN="$RUNNER_TEMP/bin"
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.6.26
+          echo "$GOBIN" >> "$GITHUB_PATH"
+      - name: Run actionlint
+        run: actionlint -color never
