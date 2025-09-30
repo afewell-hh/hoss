@@ -24,11 +24,32 @@ jobs:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Ensure workflow actions are pinned
         run: |
-          set -euo pipefail
-          violations=$(rg -n "^\s*uses:\s*[^@]+@" .github/workflows | rg -v '@[0-9a-f]{40}' || true)
+          set -Eeuo pipefail
+          violations=$(rg -n "^\s*uses:\s*[^@]+@" .github | rg -v '@[0-9a-f]{40}' || true)
           if [[ -n "$violations" ]]; then
             echo 'Found unpinned GitHub Actions references:' >&2
             echo "$violations" >&2
+            exit 1
+          fi
+
+          docker_pattern='docker://'
+          docker_pattern+='[A-Za-z0-9_.\-/]+('
+          docker_pattern+=':[A-Za-z0-9_.\-/]+'
+          docker_pattern+=')?(?!@sha256:)'
+          docker_refs=$(rg --pcre2 -n "$docker_pattern" .github -g '!**/*.md' || true)
+          if [[ -n "$docker_refs" ]]; then
+            echo 'Found docker:// references without pinned digests:' >&2
+            echo "$docker_refs" >&2
+            exit 1
+          fi
+
+          image_pattern='^\s*image:\s+'
+          image_pattern+='[-A-Za-z0-9_./]+'
+          image_pattern+='(:[-A-Za-z0-9_./]+)?(?!@sha256:)'
+          image_refs=$(rg --pcre2 -n "$image_pattern" .github -g '!**/*.md' || true)
+          if [[ -n "$image_refs" ]]; then
+            echo 'Found container image references without pinned digests:' >&2
+            echo "$image_refs" >&2
             exit 1
           fi
 

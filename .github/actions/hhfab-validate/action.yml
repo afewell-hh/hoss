@@ -25,13 +25,18 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        set -euo pipefail
+        set -Eeuo pipefail
         script="${{ inputs.script }}"
         if [[ ! -x "$script" ]]; then
           chmod +x "$script"
         fi
 
         if [[ "${{ inputs.use-container }}" == "true" ]]; then
+          image="${{ inputs.container-image }}"
+          if [[ "${image}" != *"@sha256:"* ]]; then
+            echo "hhfab container image must be pinned by digest (include @sha256)" >&2
+            exit 1
+          fi
           if ! command -v docker >/dev/null 2>&1; then
             echo "docker is required to run the hhfab container" >&2
             exit 1
@@ -40,7 +45,7 @@ runs:
           docker run --rm \
             -v "$PWD:/workspace" \
             -w /workspace \
-            "${{ inputs.container-image }}" \
+            "${image}" \
             bash -lc "set -euo pipefail; hhfab version || true; bash '$script'"
         else
           if command -v hhfab >/dev/null 2>&1; then
