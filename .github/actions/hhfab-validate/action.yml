@@ -41,6 +41,12 @@ outputs:
   durationMs:
     description: "Execution time (ms)"
     value: ${{ steps.hhfab.outputs.durationMs }}
+  hhfabVersion:
+    description: "hhfab version reported during execution"
+    value: ${{ steps.hhfab.outputs.hhfabVersion }}
+  containerImage:
+    description: "Container image reference used (local when empty)"
+    value: ${{ steps.hhfab.outputs.containerImage }}
 runs:
   using: composite
   steps:
@@ -83,6 +89,8 @@ runs:
 
         status="ok"
         exit_code=0
+        hhfab_version="unknown"
+        container_image_used="local"
         TIMEOUT_HAS_PRESERVE=0
         if command -v timeout >/dev/null 2>&1; then
           if timeout --help 2>&1 | grep -q -- '--preserve-status'; then
@@ -125,28 +133,37 @@ runs:
             net_arg=""
           fi
 
-          docker_args=(
+          container_image_used="${image}"
+          docker_base_args=(
             docker run --rm
             -v "${wd}:/workspace"
             -w /workspace
+            ${user_arg}
           )
-          docker_args+=(${user_arg})
           if [[ -n "${net_arg}" ]]; then
-            docker_args+=(${net_arg})
+            docker_base_args+=(${net_arg})
           fi
-          docker_args+=(
+
+          if hhfab_output=$(run_cmd "${docker_base_args[@]}" "${image}" bash -lc 'hhfab version' 2>/dev/null); then
+            hhfab_version="$(printf '%s\n' "${hhfab_output}" | head -n1 | tr -d '\r')"
+          fi
+
+          docker_run_cmd=(
+            "${docker_base_args[@]}"
             --env HHFAB_SCRIPT="${script_rel}"
             "${image}"
-            bash -lc "set -Eeuo pipefail; hhfab version || true; bash \"\$HHFAB_SCRIPT\""
+            bash -lc 'set -Eeuo pipefail; hhfab version || true; bash "\$HHFAB_SCRIPT"'
           )
 
-          if ! run_cmd "${docker_args[@]}"; then
+          if ! run_cmd "${docker_run_cmd[@]}"; then
             status="fail"
             exit_code=$?
           fi
         else
           if command -v hhfab >/dev/null 2>&1; then
-            hhfab version || true
+            if hhfab_output=$(hhfab version 2>/dev/null); then
+              hhfab_version="$(printf '%s\n' "${hhfab_output}" | head -n1 | tr -d '\r')"
+            fi
           else
             echo "WARN: 'hhfab' not found on PATH; running script without explicit version output." >&2
           fi
@@ -181,6 +198,8 @@ runs:
 
         echo "status=${status}" >> "$GITHUB_OUTPUT"
         echo "durationMs=${duration_ms}" >> "$GITHUB_OUTPUT"
+        echo "hhfabVersion=${hhfab_version}" >> "$GITHUB_OUTPUT"
+        echo "containerImage=${container_image_used}" >> "$GITHUB_OUTPUT"
 
         if [[ "${status}" == "fail" ]]; then
           if [[ ${exit_code} -eq 0 ]]; then

@@ -93,6 +93,8 @@ jobs:
     outputs:
       status: ${{ steps.hhfab-smoke.outputs.status }}
       duration-ms: ${{ steps.hhfab-smoke.outputs.durationMs }}
+      hhfab-version: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
+      container-image: ${{ steps.hhfab-smoke.outputs.containerImage }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -132,6 +134,48 @@ jobs:
         id: hhfab-smoke
         uses: ./.github/actions/hhfab-validate
 
+      - name: Persist hhfab summary
+        if: always()
+        env:
+          STATUS: ${{ steps.hhfab-smoke.outputs.status }}
+          DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
+          VERSION: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
+          IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
+        run: |
+          set -Eeuo pipefail
+          status="${STATUS:-}"
+          duration="${DURATION:-}"
+          version="${VERSION:-}"
+          image="${IMAGE:-}"
+          if [[ -z "$status" ]]; then
+            status='n/a'
+          fi
+          if [[ -z "$version" ]]; then
+            version='unknown'
+          fi
+          if [[ -z "$image" ]]; then
+            image='local'
+          fi
+          duration_json="null"
+          if [[ "$duration" =~ ^[0-9]+$ ]]; then
+            duration_json="$duration"
+          fi
+          jq -n \
+            --arg status "$status" \
+            --arg version "$version" \
+            --arg image "$image" \
+            --argjson duration "$duration_json" \
+            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image}' \
+            > hhfab-summary.json
+
+      - name: Upload hhfab summary
+        if: always()
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
+        with:
+          name: review-kit-summary-${{ github.run_id }}
+          path: hhfab-summary.json
+          retention-days: 3
+
       - name: Archive review-kit logs
         if: always()
         uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
@@ -149,20 +193,32 @@ jobs:
         env:
           STATUS: ${{ steps.hhfab-smoke.outputs.status }}
           DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
+          VERSION: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
+          IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
         run: |
           {
             echo '## hhfab review-kit'
             echo "- Strict required: ${STRICT_REQUIRED}"
             status="${STATUS:-}"
             duration="${DURATION:-}"
+            version="${VERSION:-}"
+            image="${IMAGE:-local}"
             if [[ -z "$status" ]]; then
               status='n/a'
             fi
             if [[ -z "$duration" ]]; then
               duration='n/a'
             fi
+            if [[ -z "$version" ]]; then
+              version='unknown'
+            fi
+            if [[ -z "$image" ]]; then
+              image='local'
+            fi
             echo "- Validation status: ${status}"
             echo "- Duration: ${duration} ms"
+            echo "- hhfab version: ${version}"
+            echo "- Container image: ${image}"
             echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -175,9 +231,13 @@ jobs:
     name: review-kit (strict)
     permissions:
       contents: read
+    env:
+      HHFAB_IMAGE: ghcr.io/your-org/hhfab@sha256:1111111111111111111111111111111111111111111111111111111111111111
     outputs:
       status: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
       duration-ms: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
+      hhfab-version: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
+      container-image: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -196,14 +256,31 @@ jobs:
 
       - run: npm ci
 
+      - name: Install cosign
+        if: github.event.pull_request.head.repo.fork == false
+        uses: sigstore/cosign-installer@1fc5bd9b1c9d6a74d2a4c51e55f66e6f14a4bc71
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Verify hhfab container signature
+        if: github.event.pull_request.head.repo.fork == false
+        run: |
+          set -Eeuo pipefail
+          cosign verify \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp='^https://github.com/your-org/.*$' \
+            "${HHFAB_IMAGE}"
+
       - name: Strict hhfab smoke (containerized)
         if: github.event.pull_request.head.repo.fork == false
         id: strict-container
         uses: ./.github/actions/hhfab-validate
         with:
-          use-container: true
-          strict: true
+          use-container: 'true'
+          strict: 'true'
           container-network: none
+          container-user: auto
+          container-image: ${{ env.HHFAB_IMAGE }}
 
       - name: Strict hhfab smoke (fork fallback)
         if: github.event.pull_request.head.repo.fork == true
@@ -211,6 +288,48 @@ jobs:
         uses: ./.github/actions/hhfab-validate
         with:
           strict: true
+
+      - name: Persist hhfab summary (strict)
+        if: always()
+        env:
+          STATUS: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
+          DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
+          VERSION: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
+          IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
+        run: |
+          set -Eeuo pipefail
+          status="${STATUS:-}"
+          duration="${DURATION:-}"
+          version="${VERSION:-}"
+          image="${IMAGE:-}"
+          if [[ -z "$status" ]]; then
+            status='n/a'
+          fi
+          if [[ -z "$version" ]]; then
+            version='unknown'
+          fi
+          if [[ -z "$image" ]]; then
+            image='local'
+          fi
+          duration_json="null"
+          if [[ "$duration" =~ ^[0-9]+$ ]]; then
+            duration_json="$duration"
+          fi
+          jq -n \
+            --arg status "$status" \
+            --arg version "$version" \
+            --arg image "$image" \
+            --argjson duration "$duration_json" \
+            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image}' \
+            > hhfab-strict-summary.json
+
+      - name: Upload hhfab summary (strict)
+        if: always()
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
+        with:
+          name: review-kit-strict-summary-${{ github.run_id }}
+          path: hhfab-strict-summary.json
+          retention-days: 3
 
       - name: Archive review-kit logs (strict)
         if: always()
@@ -229,20 +348,33 @@ jobs:
         env:
           STATUS: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
           DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
+          VERSION: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
+          IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
         run: |
           {
             echo '## hhfab review-kit (strict)'
             echo '- Mode: enforce-hhfab'
             status="${STATUS:-}"
             duration="${DURATION:-}"
+            version="${VERSION:-}"
+            image="${IMAGE:-local}"
             if [[ -z "$status" ]]; then
               status='n/a'
             fi
             if [[ -z "$duration" ]]; then
               duration='n/a'
             fi
+            if [[ -z "$version" ]]; then
+              version='unknown'
+            fi
+            if [[ -z "$image" ]]; then
+              image='local'
+            fi
             echo "- Validation status: ${status}"
             echo "- Duration: ${duration} ms"
+            echo "- hhfab version: ${version}"
+            echo "- Container image: ${image}"
+            echo '_No-network: enabled · Non-root: auto_'
             echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -267,6 +399,8 @@ jobs:
             **hhfab review-kit summary**
             - 🧪 Best-effort: `${{ needs.review-kit.result }}` (status: `${{ needs.review-kit.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit.outputs['duration-ms'] || 'n/a' }} ms`)
             - 🔒 Strict: `${{ needs.review-kit-strict.result }}` (status: `${{ needs.review-kit-strict.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit-strict.outputs['duration-ms'] || 'n/a' }} ms`)
+            - 🧾 hhfab version: `${{ needs.review-kit.outputs['hhfab-version'] || 'n/a' }}` (strict: `${{ needs.review-kit-strict.outputs['hhfab-version'] || 'n/a' }}`)
+            - 🐳 Container image: `${{ needs.review-kit-strict.outputs['container-image'] || needs.review-kit.outputs['container-image'] || 'n/a' }}`
             - ✅ Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
             - 📦 Artifacts: `review-kit-${{ github.run_id }}` (strict artifact if run: `review-kit-strict-${{ github.run_id }}`)
             - 🔗 Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
