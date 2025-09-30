@@ -174,9 +174,12 @@ if image_ref or image_digest:
         image_obj["digest"] = image_digest
     data["image"] = image_obj
 
+tool_obj = {"name": "hhfab"}
 version_value = os.environ.get("SUMMARY_HHFAB_VERSION", "").strip()
 if version_value:
     data["hhfab"] = {"version": version_value}
+    tool_obj["version"] = version_value
+data["tool"] = tool_obj
 
 skip_reason = os.environ.get("SUMMARY_SKIP_REASON", "").strip()
 if skip_reason:

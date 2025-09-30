@@ -16,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 env:
   MATRIX_FILE: .github/review-kit/matrix.txt
+  ARTIFACT_DIR: .artifacts/review-kit
 
 jobs:
   smoke-local:
@@ -24,6 +25,7 @@ jobs:
     outputs:
       matrix: ${{ steps.read-matrix.outputs.matrix }}
       strict-needed: ${{ steps.strict-needed.outputs.strict_needed }}
+      strict-files: ${{ steps.strict-changes.outputs.strict_files }}
     env:
       HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
@@ -67,6 +69,20 @@ jobs:
           else
             echo "strict_needed=false" >> "$GITHUB_OUTPUT"
           fi
+      - name: Summarize strict-triggering changes
+        if: steps.strict-changes.outputs.strict == 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          files="${{ steps.strict-changes.outputs.strict_files }}"
+          if [[ -z "${files}" ]]; then
+            files="(paths-filter reported strict=true but no files were listed)"
+          fi
+          {
+            echo '### Changed files (sensitive)'
+            echo ''
+            printf '```\n%s\n```\n' "${files}"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Run local hhfab validator
@@ -136,7 +152,7 @@ jobs:
   review_kit_strict:
     name: review-kit (strict)
     needs: smoke-local
-    if: needs.smoke-local.outputs.strict-needed == 'true'
+    if: needs['smoke-local'].outputs.strict-needed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -162,7 +178,7 @@ jobs:
         uses: ./.github/actions/hhfab-validate
         with:
           mode: strict
-          matrix: ${{ needs.smoke-local.outputs.matrix }}
+          matrix: ${{ needs['smoke-local'].outputs.matrix }}
           use-container: 'true'
           container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
       - name: Ensure strict validated targets
@@ -172,11 +188,31 @@ jobs:
           set -Eeuo pipefail
           p="${{ steps.run.outputs.summary_path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
-            echo "strict summary missing" >&2
+            echo "::error::strict summary missing" >&2
             exit 1
           fi
           jq -e '.strict == true and (.counts.validated // 0) > 0' "$p" >/dev/null \
-            || { echo "strict run had empty matrix or produced no validations" >&2; exit 1; }
+            || { echo "::error::strict run had empty matrix or produced no validations" >&2; exit 1; }
+      - name: Enforce hhfab minimum version
+        if: always()
+        env:
+          HHFAB_MIN_SEMVER: "0.4.0"
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "::error::strict summary missing" >&2
+            exit 1
+          fi
+          got=$(jq -r '.hhfab.version // empty' "$p")
+          if [[ -z "${got}" ]]; then
+            echo "::error::hhfab version missing from summary" >&2
+            exit 1
+          fi
+          printf '%s\n%s\n' "${HHFAB_MIN_SEMVER}" "${got}" | sort -V | tail -n1 | grep -qx "${got}" || {
+            echo "::error::hhfab ${got} is below required ${HHFAB_MIN_SEMVER}" >&2
+            exit 1
+          }
       - name: Enforce warning budget
         if: always()
         env:
@@ -225,6 +261,57 @@ jobs:
             exit 0
           fi
           jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Summarize strict-triggering changes
+        if: needs['smoke-local'].outputs.strict-files != ''
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          files="${{ needs['smoke-local'].outputs.strict-files }}"
+          if [[ -z "${files}" ]]; then
+            files="(paths-filter reported strict=true but no files were listed)"
+          fi
+          {
+            echo ''
+            echo '### Changed files (sensitive)'
+            echo ''
+            printf '```\n%s\n```\n' "${files}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Generate SARIF from summary
+        if: always()
+        id: sarif
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "::warning::strict summary missing; skipping SARIF generation" >&2
+            exit 0
+          fi
+          out="${ARTIFACT_DIR}/hhfab.sarif"
+          mkdir -p "$(dirname "$out")"
+          jq -n --argjson s "$(cat "$p")" '
+          {
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "hhfab",
+                    "version": ($s.tool.version // "unknown")
+                  }
+                },
+                "results": []
+              }
+            ]
+          }
+          ' > "$out"
+          echo "sarif=$out" >> "$GITHUB_OUTPUT"
+      - name: Upload SARIF
+        if: always() && steps.sarif.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@80cb6b56b93de3e779c7d476d9100d06fb87c877
+        with:
+          sarif_file: ${{ steps.sarif.outputs.sarif }}
+          category: hhfab
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

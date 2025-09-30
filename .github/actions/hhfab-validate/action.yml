@@ -26,10 +26,15 @@ inputs:
     description: Digest-pinned hhfab container image to use for strict mode runs
     required: false
     default: ghcr.io/example/hhfab@sha256:TODO
+outputs:
+  summary_path:
+    description: Path to the generated hhfab summary JSON file
+    value: ${{ steps.run-validator.outputs.summary_path }}
 runs:
   using: composite
   steps:
-    - name: Run validator
+    - id: run-validator
+      name: Run validator
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
