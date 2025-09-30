@@ -1,0 +1,52 @@
+name: hhfab validate
+description: Run hhfab validation via a pinned container or local toolchain.
+author: HOSS Automation
+inputs:
+  script:
+    description: Relative path to the validation script to execute.
+    required: false
+    default: scripts/hhfab-smoke.sh
+  working-directory:
+    description: Working directory to mount/execute.
+    required: false
+    default: .
+  use-container:
+    description: Set to true to run the script inside the pinned hhfab container.
+    required: false
+    default: 'false'
+  container-image:
+    description: Fully qualified hhfab container reference.
+    required: false
+    default: ghcr.io/your-org/hhfab@sha256:1111111111111111111111111111111111111111111111111111111111111111
+runs:
+  using: composite
+  steps:
+    - name: Run hhfab validation
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        set -euo pipefail
+        script="${{ inputs.script }}"
+        if [[ ! -x "$script" ]]; then
+          chmod +x "$script"
+        fi
+
+        if [[ "${{ inputs.use-container }}" == "true" ]]; then
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "docker is required to run the hhfab container" >&2
+            exit 1
+          fi
+
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            "${{ inputs.container-image }}" \
+            bash -lc "set -euo pipefail; hhfab version || true; bash '$script'"
+        else
+          if command -v hhfab >/dev/null 2>&1; then
+            hhfab version || true
+          else
+            echo "WARN: 'hhfab' not found on PATH; running script without explicit version output." >&2
+          fi
+          bash "$script"
+        fi

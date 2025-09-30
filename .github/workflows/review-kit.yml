@@ -14,6 +14,24 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 jobs:
+  guard-workflow-pins:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: workflow guard: pinned actions
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Ensure workflow actions are pinned
+        run: |
+          set -euo pipefail
+          violations=$(rg -n "^\s*uses:\s*[^@]+@" .github/workflows | rg -v '@[0-9a-f]{40}' || true)
+          if [[ -n "$violations" ]]; then
+            echo 'Found unpinned GitHub Actions references:' >&2
+            echo "$violations" >&2
+            exit 1
+          fi
+
   determine-strict:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -42,7 +60,9 @@ jobs:
 
   review-kit:
     if: github.event_name == 'pull_request'
-    needs: determine-strict
+    needs:
+      - guard-workflow-pins
+      - determine-strict
     runs-on: ubuntu-latest
     name: review-kit (best-effort)
     permissions:
@@ -85,7 +105,7 @@ jobs:
           npm run test:core || npm test
 
       - name: hhfab smoke (best-effort)
-        run: bash scripts/hhfab-smoke.sh
+        uses: ./.github/actions/hhfab-validate
 
       - name: Archive review-kit logs
         if: always()
@@ -110,7 +130,9 @@ jobs:
 
   review-kit-strict:
     if: github.event_name == 'pull_request' && needs.determine-strict.outputs.require-strict == 'true'
-    needs: determine-strict
+    needs:
+      - guard-workflow-pins
+      - determine-strict
     runs-on: ubuntu-latest
     name: review-kit (strict)
     permissions:
@@ -133,17 +155,15 @@ jobs:
 
       - run: npm ci
 
-      - name: Show hhfab version (containerized)
+      - name: Strict hhfab smoke (containerized)
         if: github.event.pull_request.head.repo.fork == false
-        run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'hhfab version'
-
-      - name: Strict hhfab smoke
-        if: github.event.pull_request.head.repo.fork == false
-        run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'scripts/hhfab-smoke.sh'
+        uses: ./.github/actions/hhfab-validate
+        with:
+          use-container: true
 
       - name: Strict hhfab smoke (fork fallback)
         if: github.event.pull_request.head.repo.fork == true
-        run: bash scripts/hhfab-smoke.sh
+        uses: ./.github/actions/hhfab-validate
 
       - name: Archive review-kit logs (strict)
         if: always()
