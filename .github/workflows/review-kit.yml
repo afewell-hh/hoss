@@ -97,6 +97,7 @@ jobs:
       container-image: ${{ steps.hhfab-smoke.outputs.containerImage }}
       image-digest: ${{ steps.hhfab-smoke.outputs.imageDigest }}
       warnings-count: ${{ steps.hhfab-smoke.outputs.warningsCount }}
+      strict-mode: ${{ steps.hhfab-smoke.outputs.strict }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -145,41 +146,37 @@ jobs:
           IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
           DIGEST: ${{ steps.hhfab-smoke.outputs.imageDigest }}
           WARNINGS: ${{ steps.hhfab-smoke.outputs.warningsCount }}
+          STRICT_FLAG: ${{ steps.hhfab-smoke.outputs.strict }}
         run: |
           set -Eeuo pipefail
-          status="${STATUS:-}"
-          duration="${DURATION:-}"
-          version="${VERSION:-}"
-          image="${IMAGE:-}"
+          artifact_summary="review-kit-artifacts/hhfab-summary.json"
+          if [[ -f "$artifact_summary" ]]; then
+            cp "$artifact_summary" hhfab-summary.json
+            exit 0
+          fi
+
+          status="${STATUS:-n/a}"
+          duration="${DURATION:-0}"
+          version="${VERSION:-unknown}"
+          image="${IMAGE:-local}"
           digest="${DIGEST:-}"
-          warnings="${WARNINGS:-}"
-          if [[ -z "$status" ]]; then
-            status='n/a'
+          warnings="${WARNINGS:-0}"
+          strict_flag="${STRICT_FLAG:-false}"
+          if [[ ! "$duration" =~ ^[0-9]+$ ]]; then
+            duration=0
           fi
-          if [[ -z "$version" ]]; then
-            version='unknown'
-          fi
-          if [[ -z "$image" ]]; then
-            image='local'
-          fi
-          if [[ -z "$digest" ]]; then
-            digest=''
-          fi
-          if [[ -z "$warnings" ]]; then
-            warnings='0'
-          fi
-          duration_json="null"
-          if [[ "$duration" =~ ^[0-9]+$ ]]; then
-            duration_json="$duration"
+          if [[ ! "$warnings" =~ ^[0-9]+$ ]]; then
+            warnings=0
           fi
           jq -n \
             --arg status "$status" \
             --arg version "$version" \
-            --arg image "$image" \
             --arg digest "$digest" \
-            --arg warnings "$warnings" \
-            --argjson duration "$duration_json" \
-            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image, imageDigest:$digest, warnings:(try ($warnings|tonumber) catch 0)}' \
+            --arg image "$image" \
+            --arg strict "$strict_flag" \
+            --argjson duration "$duration" \
+            --argjson warnings "$warnings" \
+            '{status:$status, durationMs:$duration, hhfabVersion:$version, imageDigest:$digest, containerImage:$image, image:$image, warnings:$warnings, strict:($strict == "true")}' \
             > hhfab-summary.json
 
       - name: Upload hhfab summary
@@ -190,13 +187,13 @@ jobs:
           path: hhfab-summary.json
           retention-days: 3
 
-      - name: Archive review-kit logs
+      - name: Archive review-kit artifacts
         if: always()
         uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
         with:
           name: review-kit-${{ github.run_id }}
           path: |
-            **/*.hhfab.log
+            review-kit-artifacts/**
             **/review-kit/**/report/**/*
           retention-days: 3
           compression-level: 6
@@ -211,6 +208,7 @@ jobs:
           IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
           DIGEST: ${{ steps.hhfab-smoke.outputs.imageDigest }}
           WARNINGS: ${{ steps.hhfab-smoke.outputs.warningsCount }}
+          STRICT: ${{ steps.hhfab-smoke.outputs.strict }}
         run: |
           {
             echo '## hhfab review-kit'
@@ -221,6 +219,7 @@ jobs:
             image="${IMAGE:-local}"
             digest="${DIGEST:-}"
             warnings="${WARNINGS:-0}"
+            strict_flag="${STRICT:-false}"
             if [[ -z "$status" ]]; then
               status='n/a'
             fi
@@ -242,6 +241,8 @@ jobs:
             echo "- Container image: ${image}"
             echo "- Image digest: ${digest}"
             echo "- Warnings: ${warnings}"
+            echo "- Strict mode requested: ${strict_flag}"
+            echo "- Summary artifact: review-kit-summary-${GITHUB_RUN_ID}"
             echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -263,6 +264,7 @@ jobs:
       container-image: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
       image-digest: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
       warnings-count: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
+      strict-mode: ${{ steps.strict-container.outputs.strict || steps.strict-local.outputs.strict }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -329,41 +331,37 @@ jobs:
           IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
           DIGEST: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
           WARNINGS: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
+          STRICT_FLAG: ${{ steps.strict-container.outputs.strict || steps.strict-local.outputs.strict }}
         run: |
           set -Eeuo pipefail
-          status="${STATUS:-}"
-          duration="${DURATION:-}"
-          version="${VERSION:-}"
-          image="${IMAGE:-}"
+          artifact_summary="review-kit-artifacts/hhfab-summary.json"
+          if [[ -f "$artifact_summary" ]]; then
+            cp "$artifact_summary" hhfab-strict-summary.json
+            exit 0
+          fi
+
+          status="${STATUS:-n/a}"
+          duration="${DURATION:-0}"
+          version="${VERSION:-unknown}"
+          image="${IMAGE:-local}"
           digest="${DIGEST:-}"
-          warnings="${WARNINGS:-}"
-          if [[ -z "$status" ]]; then
-            status='n/a'
+          warnings="${WARNINGS:-0}"
+          strict_flag="${STRICT_FLAG:-true}"
+          if [[ ! "$duration" =~ ^[0-9]+$ ]]; then
+            duration=0
           fi
-          if [[ -z "$version" ]]; then
-            version='unknown'
-          fi
-          if [[ -z "$image" ]]; then
-            image='local'
-          fi
-          if [[ -z "$digest" ]]; then
-            digest=''
-          fi
-          if [[ -z "$warnings" ]]; then
-            warnings='0'
-          fi
-          duration_json="null"
-          if [[ "$duration" =~ ^[0-9]+$ ]]; then
-            duration_json="$duration"
+          if [[ ! "$warnings" =~ ^[0-9]+$ ]]; then
+            warnings=0
           fi
           jq -n \
             --arg status "$status" \
             --arg version "$version" \
-            --arg image "$image" \
             --arg digest "$digest" \
-            --arg warnings "$warnings" \
-            --argjson duration "$duration_json" \
-            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image, imageDigest:$digest, warnings:(try ($warnings|tonumber) catch 0)}' \
+            --arg image "$image" \
+            --arg strict "$strict_flag" \
+            --argjson duration "$duration" \
+            --argjson warnings "$warnings" \
+            '{status:$status, durationMs:$duration, hhfabVersion:$version, imageDigest:$digest, containerImage:$image, image:$image, warnings:$warnings, strict:($strict == "true")}' \
             > hhfab-strict-summary.json
 
       - name: Upload hhfab summary (strict)
@@ -374,13 +372,13 @@ jobs:
           path: hhfab-strict-summary.json
           retention-days: 3
 
-      - name: Archive review-kit logs (strict)
+      - name: Archive review-kit artifacts (strict)
         if: always()
         uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
         with:
           name: review-kit-strict-${{ github.run_id }}
           path: |
-            **/*.hhfab.log
+            review-kit-artifacts/**
             **/review-kit/**/report/**/*
           retention-days: 3
           compression-level: 6
@@ -395,6 +393,7 @@ jobs:
           IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
           DIGEST: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
           WARNINGS: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
+          STRICT: ${{ steps.strict-container.outputs.strict || steps.strict-local.outputs.strict }}
         run: |
           {
             echo '## hhfab review-kit (strict)'
@@ -405,6 +404,7 @@ jobs:
             image="${IMAGE:-local}"
             digest="${DIGEST:-}"
             warnings="${WARNINGS:-0}"
+            strict_flag="${STRICT:-true}"
             if [[ -z "$status" ]]; then
               status='n/a'
             fi
@@ -427,6 +427,8 @@ jobs:
             echo "- Image digest: ${digest}"
             echo "- Warnings: ${warnings}"
             echo '_No-network: enabled · Non-root: auto_'
+            echo "- Strict flag: ${strict_flag}"
+            echo "- Summary artifact: review-kit-strict-summary-${GITHUB_RUN_ID}"
             echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -451,6 +453,7 @@ jobs:
             **hhfab review-kit summary**
             - 🧪 Best-effort: `${{ needs.review-kit.result }}` (status: `${{ needs.review-kit.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit.outputs['duration-ms'] || 'n/a' }} ms`, warnings: `${{ needs.review-kit.outputs['warnings-count'] || '0' }}`)
             - 🔒 Strict: `${{ needs.review-kit-strict.result }}` (status: `${{ needs.review-kit-strict.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit-strict.outputs['duration-ms'] || 'n/a' }} ms`, warnings: `${{ needs.review-kit-strict.outputs['warnings-count'] || '0' }}`)
+            - 🛡️ Strict mode flags — best-effort: `${{ needs.review-kit.outputs['strict-mode'] || 'false' }}`, strict job: `${{ needs.review-kit-strict.outputs['strict-mode'] || 'false' }}`
             - 🧾 hhfab version: `${{ needs.review-kit.outputs['hhfab-version'] || 'n/a' }}` (strict: `${{ needs.review-kit-strict.outputs['hhfab-version'] || 'n/a' }}`)
             - 🐳 Container image: `${{ needs.review-kit-strict.outputs['container-image'] || needs.review-kit.outputs['container-image'] || 'n/a' }}`
             - 🧬 Image digest: `${{ needs.review-kit-strict.outputs['image-digest'] || needs.review-kit.outputs['image-digest'] || 'n/a' }}`
