@@ -83,6 +83,42 @@ jobs:
             exit 0
           fi
           jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Append strict target summary
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            exit 0
+          fi
+          validated=$(jq -r '.counts.validated // 0' "$p")
+          failures=$(jq -r '.counts.failures // 0' "$p")
+          warnings=$(jq -r '.counts.warnings // 0' "$p")
+          digest=$(jq -r '.image.digest // ""' "$p")
+          {
+            echo ""
+            echo "#### Strict target summary"
+            echo ""
+            echo "| validated | failures | warnings |"
+            echo "| --- | --- | --- |"
+            echo "| ${validated} | ${failures} | ${warnings} |"
+            if [[ -n "${digest}" ]]; then
+              echo ""
+              echo "Image digest: ${digest}"
+            fi
+            mapfile -t targets < <(jq -r '.matrix[]?' "$p" | head -n 5)
+            if (( ${#targets[@]} > 0 )); then
+              echo ""
+              echo "<details><summary>Validated targets (first ${#targets[@]} of ${validated})</summary>"
+              echo ""
+              for t in "${targets[@]}"; do
+                echo "- ${t}"
+              done
+              echo ""
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always() && steps.run.outputs.summary_path != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

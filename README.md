@@ -1,6 +1,7 @@
 # hoss
 
 [![review-kit](../../actions/workflows/review-kit.yml/badge.svg)](../../actions/workflows/review-kit.yml)
+[![review-kit nightly](../../actions/workflows/review-kit.yml/badge.svg?event=schedule)](../../actions/workflows/review-kit.yml)
 
 ## Review Kit
 
