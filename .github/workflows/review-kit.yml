@@ -14,6 +14,8 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+env:
+  MATRIX_FILE: .github/review-kit/matrix.txt
 
 jobs:
   smoke-local:
@@ -29,22 +31,26 @@ jobs:
       - id: read-matrix
         run: |
           set -Eeuo pipefail
-          if [[ ! -f .github/review-kit/matrix.txt ]]; then
-            echo "Matrix file missing (.github/review-kit/matrix.txt)" >&2
+          if [[ ! -f "${MATRIX_FILE}" ]]; then
+            echo "Matrix file missing (${MATRIX_FILE})" >&2
             exit 1
           fi
           printf "matrix<<'EOF'\n" >> "$GITHUB_OUTPUT"
-          sed -e '/^\s*#/d' -e '/^\s*$/d' .github/review-kit/matrix.txt >> "$GITHUB_OUTPUT"
+          sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "${MATRIX_FILE}" >> "$GITHUB_OUTPUT"
           printf "EOF\n" >> "$GITHUB_OUTPUT"
       - name: Detect strict-impacting changes
         if: github.event_name == 'pull_request'
         id: strict-changes
         uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         with:
+          list-files: shell
           filters: |
             strict:
-              - 'samples/**'
-              - 'contracts/**'
+              - added|modified|deleted:
+                  - 'samples/**'
+                  - 'contracts/**'
+                  - '.github/review-kit/**'
+                  - 'scripts/hhfab-*.sh'
       - name: Determine strict requirement
         id: strict-needed
         env:
@@ -127,7 +133,8 @@ jobs:
           path: ${{ steps.run.outputs.summary_path }}
           if-no-files-found: warn
           retention-days: 1
-  strict:
+  review_kit_strict:
+    name: review-kit (strict)
     needs: smoke-local
     if: needs.smoke-local.outputs.strict-needed == 'true'
     runs-on: ubuntu-latest
@@ -170,6 +177,24 @@ jobs:
           fi
           jq -e '.strict == true and (.counts.validated // 0) > 0' "$p" >/dev/null \
             || { echo "strict run had empty matrix or produced no validations" >&2; exit 1; }
+      - name: Enforce warning budget
+        if: always()
+        env:
+          WARN_BUDGET: "0"
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "strict summary missing" >&2
+            exit 1
+          fi
+          warns=$(jq -r '.counts.warnings // 0' "$p")
+          echo "warnings=${warns} budget=${WARN_BUDGET}"
+          if [[ "$warns" =~ ^[0-9]+$ ]] && [ "$warns" -le "$WARN_BUDGET" ]; then
+            exit 0
+          fi
+          echo "::error::hhfab warnings (${warns}) exceed budget (${WARN_BUDGET})" >&2
+          exit 1
       - name: Enforce strict status
         if: always()
         shell: bash
