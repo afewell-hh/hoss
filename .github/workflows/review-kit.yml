@@ -118,6 +118,22 @@ jobs:
           matrix: ${{ needs.smoke-local.outputs.matrix }}
           use-container: 'true'
           container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
+      - name: Enforce strict status
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "strict summary missing" >&2
+            exit 1
+          fi
+          status=$(jq -r '.status // "error"' "$p")
+          if [[ "$status" == "ok" ]]; then
+            exit 0
+          fi
+          echo "strict validator status=${status}" >&2
+          exit 1
       - name: Remove hhfab matcher
         if: always()
         run: echo "::remove-matcher owner=hhfab::"

@@ -64,6 +64,8 @@ runs:
             exit 1
           fi
 
+          mkdir -p "${PWD}/.artifacts"
+
           docker run --rm \
             --network=none \
             --read-only \
