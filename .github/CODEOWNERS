@@ -1,2 +1,3 @@
 # Auto-review for ONF schema goldens
-samples/** @afewell-hh/onf-schema
+/samples/**     @afewell-hh/onf-schema @onf-schemas @network-validators
+/contracts/**   @afewell-hh/onf-schema @onf-schemas

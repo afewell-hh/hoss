@@ -4,3 +4,5 @@ Please follow **REVIEW_KIT_PR13.md** before requesting merge:
 - [ ] Lint/type/tests green
 - [ ] ONF alignment quick-probes completed
 - [ ] Goldens + `hhfab validate` smoke present (or tracked as follow-ups)
+- [ ] I ran `make review-kit` locally and it passed
+- [ ] I attached hhfab logs if any validations failed

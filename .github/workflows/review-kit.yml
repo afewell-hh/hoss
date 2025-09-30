@@ -30,3 +30,30 @@ jobs:
       - name: hhfab smoke (best-effort)
         run: |
           bash scripts/hhfab-smoke.sh
+
+      - name: Archive smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hhfab-smoke-logs
+          path: ./**/*.hhfab.log
+          if-no-files-found: ignore
+
+  review-kit-strict:
+    if: contains(github.event.pull_request.labels.*.name, 'enforce-hhfab')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install hhfab (containerized)
+        run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'hhfab version'
+
+      - name: Strict hhfab smoke
+        run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'scripts/hhfab-smoke.sh'
