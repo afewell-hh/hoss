@@ -1,0 +1,32 @@
+name: review-kit
+on:
+  pull_request:
+    paths:
+      - '**/*.ts'
+      - '**/*.tsx'
+      - 'samples/**'
+      - 'scripts/hhfab-smoke.sh'
+      - 'REVIEW_KIT_PR13.md'
+jobs:
+  review-kit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Lint / Type / Tests
+        run: |
+          npm run lint -- --max-warnings=0
+          npm run typecheck || npx tsc -p tsconfig.json --noEmit
+          npm run test:core || npm test
+
+      - name: hhfab smoke (best-effort)
+        run: |
+          bash scripts/hhfab-smoke.sh

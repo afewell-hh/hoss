@@ -1,0 +1,10 @@
+{
+  "name": "hoss",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "hhfab:smoke": "bash scripts/hhfab-smoke.sh",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:core": "vitest run -t @core"
+  }
+}
