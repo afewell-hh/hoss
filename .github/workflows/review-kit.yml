@@ -7,17 +7,67 @@ on:
       - 'samples/**'
       - 'scripts/hhfab-smoke.sh'
       - 'REVIEW_KIT_PR13.md'
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: review-kit-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
 jobs:
+  determine-strict:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      require-strict: ${{ steps.evaluate.outputs.require_strict }}
+    steps:
+      - uses: actions/github-script@v7
+        id: evaluate
+        with:
+          script: |
+            const labels = (context.payload.pull_request?.labels || []).map(label => label.name);
+            let requireStrict = labels.includes('enforce-hhfab');
+            if (!requireStrict) {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.payload.number,
+                per_page: 100,
+              });
+              requireStrict = files.some(file => /^(contracts|samples)\//.test(file.filename));
+            }
+            core.setOutput('require_strict', requireStrict ? 'true' : 'false');
+
   review-kit:
+    needs: determine-strict
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Register hhfab problem matcher
+        run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
+
+      - name: Ensure PR checklist confirmed
+        if: github.event_name == 'pull_request'
+        run: |
+          body="$(jq -r '.pull_request.body' "$GITHUB_EVENT_PATH")"
+          echo "$body" | grep -q '\- \[x\] I ran `make review-kit`' || {
+            echo 'Checklist not confirmed.'
+            exit 1
+          }
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Show tool versions
+        run: |
+          node -v
+          npm -v
+          hhfab version || true
 
       - run: npm ci
 
@@ -31,29 +81,52 @@ jobs:
         run: |
           bash scripts/hhfab-smoke.sh
 
-      - name: Archive smoke logs
+      - name: Archive review-kit logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hhfab-smoke-logs
-          path: ./**/*.hhfab.log
+          name: review-kit-${{ github.run_id }}
+          path: |
+            **/*.hhfab.log
+            **/review-kit/**/report/**/*
+          retention-days: 7
           if-no-files-found: ignore
 
   review-kit-strict:
-    if: contains(github.event.pull_request.labels.*.name, 'enforce-hhfab')
+    needs: determine-strict
+    if: needs.determine-strict.outputs.require-strict == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Register hhfab problem matcher
+        run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
 
+      - name: Show tool versions
+        run: |
+          node -v
+          npm -v
+
       - run: npm ci
 
-      - name: Install hhfab (containerized)
+      - name: Show hhfab version (containerized)
         run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'hhfab version'
 
       - name: Strict hhfab smoke
         run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'scripts/hhfab-smoke.sh'
+
+      - name: Archive review-kit logs (strict)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-kit-strict-${{ github.run_id }}
+          path: |
+            **/*.hhfab.log
+            **/review-kit/**/report/**/*
+          retention-days: 7
+          if-no-files-found: ignore

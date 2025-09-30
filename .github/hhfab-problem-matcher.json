@@ -1,0 +1,14 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "hhfab",
+      "pattern": [
+        {
+          "regexp": "^ERROR: validation failed for (?<file>.+)$",
+          "file": 1,
+          "message": 0
+        }
+      ]
+    }
+  ]
+}

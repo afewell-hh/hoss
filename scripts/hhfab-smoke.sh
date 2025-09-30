@@ -12,6 +12,7 @@ shopt -s nullglob
 for f in samples/**/*.yaml samples/**/*.yml; do
   echo "Validating with hhfab: $f"
   if ! hhfab validate --in "$f"; then
+    echo '::error file=$f::hhfab validation failed'
     echo "ERROR: validation failed for $f"
     status=1
   fi
