@@ -18,18 +18,88 @@ inputs:
     description: Fully qualified hhfab container reference.
     required: false
     default: ghcr.io/your-org/hhfab@sha256:1111111111111111111111111111111111111111111111111111111111111111
+  container-network:
+    description: Optional docker network mode (set to none to disable egress)
+    required: false
+    default: default
+  timeout-seconds:
+    description: Hard timeout for the validation run (prevents hung jobs)
+    required: false
+    default: '900'
+  container-user:
+    description: UID:GID for docker run to avoid root-owned files (auto uses host id)
+    required: false
+    default: 'auto'
+  strict:
+    description: Treat warnings as errors (propagate nonzero on warning)
+    required: false
+    default: 'false'
+outputs:
+  status:
+    description: "ok|fail|warn"
+    value: ${{ steps.hhfab.outputs.status }}
+  durationMs:
+    description: "Execution time (ms)"
+    value: ${{ steps.hhfab.outputs.durationMs }}
 runs:
   using: composite
   steps:
-    - name: Run hhfab validation
+    - id: hhfab
+      name: Run hhfab validation
       shell: bash
       working-directory: ${{ inputs.working-directory }}
+      env:
+        _TIMEOUT: ${{ inputs.timeout-seconds }}
+        _STRICT: ${{ inputs.strict }}
+        _CONTAINER_USER: ${{ inputs.container-user }}
       run: |
         set -Eeuo pipefail
+
+        start_ns=$(date +%s%N)
         script="${{ inputs.script }}"
-        if [[ ! -x "$script" ]]; then
-          chmod +x "$script"
+
+        # sanitize & constrain paths
+        root="$(realpath -m "${GITHUB_WORKSPACE}")"
+        wd="$(realpath -m ".")"
+        if [[ "${wd}" != "${root}"* ]]; then
+          echo "Working directory escapes GITHUB_WORKSPACE" >&2
+          exit 2
         fi
+
+        script_path="$(realpath -m "${script}")"
+        if [[ "${script_path}" != "${root}"* ]]; then
+          echo "Script path escapes GITHUB_WORKSPACE" >&2
+          exit 2
+        fi
+        if script_rel=$(realpath --relative-to="${wd}" "${script_path}" 2>/dev/null); then
+          script_rel="./${script_rel}"
+        else
+          script_rel="/workspace${script_path#${root}}"
+        fi
+
+        if [[ ! -x "${script_path}" ]]; then
+          chmod +x "${script_path}"
+        fi
+
+        status="ok"
+        exit_code=0
+        TIMEOUT_HAS_PRESERVE=0
+        if command -v timeout >/dev/null 2>&1; then
+          if timeout --help 2>&1 | grep -q -- '--preserve-status'; then
+            TIMEOUT_HAS_PRESERVE=1
+          fi
+        fi
+        run_cmd() {
+          if command -v timeout >/dev/null 2>&1; then
+            if [[ ${TIMEOUT_HAS_PRESERVE} -eq 1 ]]; then
+              timeout --preserve-status -s TERM "${_TIMEOUT}" "$@"
+            else
+              timeout -s TERM "${_TIMEOUT}" "$@"
+            fi
+          else
+            "$@"
+          fi
+        }
 
         if [[ "${{ inputs.use-container }}" == "true" ]]; then
           image="${{ inputs.container-image }}"
@@ -42,16 +112,79 @@ runs:
             exit 1
           fi
 
-          docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace \
-            "${image}" \
-            bash -lc "set -euo pipefail; hhfab version || true; bash '$script'"
+          if [[ "${_CONTAINER_USER}" == "auto" ]]; then
+            uid="$(id -u)"; gid="$(id -g)"
+            user_arg="--user ${uid}:${gid}"
+          else
+            user_arg="--user ${_CONTAINER_USER}"
+          fi
+
+          if [[ "${{ inputs.container-network }}" == "none" ]]; then
+            net_arg="--network=none"
+          else
+            net_arg=""
+          fi
+
+          docker_args=(
+            docker run --rm
+            -v "${wd}:/workspace"
+            -w /workspace
+          )
+          docker_args+=(${user_arg})
+          if [[ -n "${net_arg}" ]]; then
+            docker_args+=(${net_arg})
+          fi
+          docker_args+=(
+            --env HHFAB_SCRIPT="${script_rel}"
+            "${image}"
+            bash -lc "set -Eeuo pipefail; hhfab version || true; bash \"\$HHFAB_SCRIPT\""
+          )
+
+          if ! run_cmd "${docker_args[@]}"; then
+            status="fail"
+            exit_code=$?
+          fi
         else
           if command -v hhfab >/dev/null 2>&1; then
             hhfab version || true
           else
             echo "WARN: 'hhfab' not found on PATH; running script without explicit version output." >&2
           fi
-          bash "$script"
+          if ! run_cmd bash "${script_path}"; then
+            status="fail"
+            exit_code=$?
+          fi
+        fi
+
+        if [[ "${_STRICT}" == "true" ]]; then
+          if command -v rg >/dev/null 2>&1; then
+            if rg -n --fixed-strings 'warning:' --hidden --no-messages -- 'review-kit.log' >/dev/null 2>&1; then
+              echo "Strict mode: warnings detected" >&2
+              status="warn"
+            fi
+          elif [[ -f review-kit.log ]] && command -v grep >/dev/null 2>&1; then
+            if grep -F -n 'warning:' review-kit.log >/dev/null 2>&1; then
+              echo "Strict mode: warnings detected" >&2
+              status="warn"
+            fi
+          fi
+        fi
+
+        end_ns=$(date +%s%N)
+        duration_ms=$(( (end_ns - start_ns) / 1000000 ))
+
+        if [[ "${status}" == "warn" && "${_STRICT}" == "true" ]]; then
+          echo "Warnings treated as errors" >&2
+          status="fail"
+          exit_code=3
+        fi
+
+        echo "status=${status}" >> "$GITHUB_OUTPUT"
+        echo "durationMs=${duration_ms}" >> "$GITHUB_OUTPUT"
+
+        if [[ "${status}" == "fail" ]]; then
+          if [[ ${exit_code} -eq 0 ]]; then
+            exit 1
+          fi
+          exit ${exit_code}
         fi

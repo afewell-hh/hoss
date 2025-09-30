@@ -90,6 +90,9 @@ jobs:
       contents: read
     env:
       STRICT_REQUIRED: ${{ needs.determine-strict.outputs.require-strict }}
+    outputs:
+      status: ${{ steps.hhfab-smoke.outputs.status }}
+      duration-ms: ${{ steps.hhfab-smoke.outputs.durationMs }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -126,6 +129,7 @@ jobs:
           npm run test:core || npm test
 
       - name: hhfab smoke (best-effort)
+        id: hhfab-smoke
         uses: ./.github/actions/hhfab-validate
 
       - name: Archive review-kit logs
@@ -142,10 +146,23 @@ jobs:
 
       - name: Write run summary
         if: always()
+        env:
+          STATUS: ${{ steps.hhfab-smoke.outputs.status }}
+          DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
         run: |
           {
             echo '## hhfab review-kit'
             echo "- Strict required: ${STRICT_REQUIRED}"
+            status="${STATUS:-}"
+            duration="${DURATION:-}"
+            if [[ -z "$status" ]]; then
+              status='n/a'
+            fi
+            if [[ -z "$duration" ]]; then
+              duration='n/a'
+            fi
+            echo "- Validation status: ${status}"
+            echo "- Duration: ${duration} ms"
             echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -158,6 +175,9 @@ jobs:
     name: review-kit (strict)
     permissions:
       contents: read
+    outputs:
+      status: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
+      duration-ms: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -178,13 +198,19 @@ jobs:
 
       - name: Strict hhfab smoke (containerized)
         if: github.event.pull_request.head.repo.fork == false
+        id: strict-container
         uses: ./.github/actions/hhfab-validate
         with:
           use-container: true
+          strict: true
+          container-network: none
 
       - name: Strict hhfab smoke (fork fallback)
         if: github.event.pull_request.head.repo.fork == true
+        id: strict-local
         uses: ./.github/actions/hhfab-validate
+        with:
+          strict: true
 
       - name: Archive review-kit logs (strict)
         if: always()
@@ -200,10 +226,23 @@ jobs:
 
       - name: Write run summary
         if: always()
+        env:
+          STATUS: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
+          DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
         run: |
           {
             echo '## hhfab review-kit (strict)'
             echo '- Mode: enforce-hhfab'
+            status="${STATUS:-}"
+            duration="${DURATION:-}"
+            if [[ -z "$status" ]]; then
+              status='n/a'
+            fi
+            if [[ -z "$duration" ]]; then
+              duration='n/a'
+            fi
+            echo "- Validation status: ${status}"
+            echo "- Duration: ${duration} ms"
             echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -226,8 +265,8 @@ jobs:
           header: review-kit
           message: |
             **hhfab review-kit summary**
-            - 🧪 Best-effort: `${{ needs.review-kit.result }}`
-            - 🔒 Strict: `${{ needs.review-kit-strict.result }}`
+            - 🧪 Best-effort: `${{ needs.review-kit.result }}` (status: `${{ needs.review-kit.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit.outputs['duration-ms'] || 'n/a' }} ms`)
+            - 🔒 Strict: `${{ needs.review-kit-strict.result }}` (status: `${{ needs.review-kit-strict.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit-strict.outputs['duration-ms'] || 'n/a' }} ms`)
             - ✅ Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
             - 📦 Artifacts: `review-kit-${{ github.run_id }}` (strict artifact if run: `review-kit-strict-${{ github.run_id }}`)
             - 🔗 Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
