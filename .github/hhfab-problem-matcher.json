@@ -4,9 +4,12 @@
       "owner": "hhfab",
       "pattern": [
         {
-          "regexp": "^ERROR: validation failed for (?<file>.+)$",
+          "regexp": "^(.+):(\\d+):(\\d+):\\s(error|warning):\\s(.+)$",
           "file": 1,
-          "message": 0
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
         }
       ]
     }

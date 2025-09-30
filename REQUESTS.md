@@ -2,6 +2,7 @@
 - Awaiting R-SYN bundle: Issues #10 (Synthesis), #11 (Architecture Recommendations), #12 (Roadmap).
 - If R-SYN is delayed, send R-ALG (breakout naming function + types) as a fallback starter payload.
 - HOSS PR #13 quick review kit prepared in `REVIEW_KIT_PR13.md`; follow it to validate the contribution end-to-end.
+- Add the `review-kit-strict` job as a required status check via branch protection once the workflow stabilizes.
 
 ## Seed Bundle for LLA (HNC/HOSS design)
 - [ ] R-SYN: Issue #10 body

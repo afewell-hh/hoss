@@ -7,14 +7,19 @@ on:
       - 'samples/**'
       - 'scripts/hhfab-smoke.sh'
       - 'REVIEW_KIT_PR13.md'
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch: {}
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 concurrency:
   group: review-kit-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 jobs:
   determine-strict:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,40 +27,46 @@ jobs:
     outputs:
       require-strict: ${{ steps.evaluate.outputs.require_strict }}
     steps:
+      - uses: dorny/paths-filter@v3
+        id: cf
+        with:
+          filters: |
+            hhfab:
+              - 'contracts/**'
+              - 'samples/**'
       - uses: actions/github-script@v7
         id: evaluate
+        env:
+          PATHS_MATCH: ${{ steps.cf.outputs.hhfab }}
         with:
           script: |
             const labels = (context.payload.pull_request?.labels || []).map(label => label.name);
-            let requireStrict = labels.includes('enforce-hhfab');
-            if (!requireStrict) {
-              const files = await github.paginate(github.rest.pulls.listFiles, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: context.payload.number,
-                per_page: 100,
-              });
-              requireStrict = files.some(file => /^(contracts|samples)\//.test(file.filename));
-            }
+            const requireStrict = labels.includes('enforce-hhfab') || process.env.PATHS_MATCH === 'true';
             core.setOutput('require_strict', requireStrict ? 'true' : 'false');
 
   review-kit:
+    if: github.event_name == 'pull_request'
     needs: determine-strict
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      STRICT_REQUIRED: ${{ needs.determine-strict.outputs.require-strict }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Register hhfab problem matcher
         run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
 
-      - name: Ensure PR checklist confirmed
-        if: github.event_name == 'pull_request'
+      - name: Ensure PR checklist confirmed (with override)
+        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'maintainer-override')
         run: |
           body="$(jq -r '.pull_request.body' "$GITHUB_EVENT_PATH")"
-          echo "$body" | grep -q '\- \[x\] I ran `make review-kit`' || {
+          if ! echo "$body" | grep -q '\- \[x\] I ran `make review-kit`'; then
             echo 'Checklist not confirmed.'
             exit 1
-          }
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -78,8 +89,7 @@ jobs:
           npm run test:core || npm test
 
       - name: hhfab smoke (best-effort)
-        run: |
-          bash scripts/hhfab-smoke.sh
+        run: bash scripts/hhfab-smoke.sh
 
       - name: Archive review-kit logs
         if: always()
@@ -92,10 +102,34 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Write run summary
+        if: always()
+        run: |
+          {
+            echo '## hhfab review-kit'
+            echo "- Strict required: ${STRICT_REQUIRED}"
+            echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upsert sticky comment
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: review-kit
+          message: |
+            **hhfab review-kit**
+            - Status: ${{ job.status }}
+            - Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
+            - Artifacts: `review-kit-${{ github.run_id }}`
+            - Problem-matcher: `hhfab`
+
   review-kit-strict:
+    if: github.event_name == 'pull_request' && needs.determine-strict.outputs.require-strict == 'true'
     needs: determine-strict
-    if: needs.determine-strict.outputs.require-strict == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
 
@@ -130,3 +164,35 @@ jobs:
             **/review-kit/**/report/**/*
           retention-days: 7
           if-no-files-found: ignore
+
+      - name: Write run summary
+        if: always()
+        run: |
+          {
+            echo '## hhfab review-kit (strict)'
+            echo '- Mode: enforce-hhfab'
+            echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upsert sticky comment
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: review-kit-strict
+          message: |
+            **hhfab review-kit (strict)**
+            - Status: ${{ job.status }}
+            - Artifacts: `review-kit-strict-${{ github.run_id }}`
+            - Problem-matcher: `hhfab`
+
+  nightly-hhfab:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Register hhfab problem matcher
+        run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
+      - name: Run nightly review-kit smoke
+        run: make review-kit
