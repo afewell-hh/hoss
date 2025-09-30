@@ -95,6 +95,8 @@ jobs:
       duration-ms: ${{ steps.hhfab-smoke.outputs.durationMs }}
       hhfab-version: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
       container-image: ${{ steps.hhfab-smoke.outputs.containerImage }}
+      image-digest: ${{ steps.hhfab-smoke.outputs.imageDigest }}
+      warnings-count: ${{ steps.hhfab-smoke.outputs.warningsCount }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -141,12 +143,16 @@ jobs:
           DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
           VERSION: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
           IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
+          DIGEST: ${{ steps.hhfab-smoke.outputs.imageDigest }}
+          WARNINGS: ${{ steps.hhfab-smoke.outputs.warningsCount }}
         run: |
           set -Eeuo pipefail
           status="${STATUS:-}"
           duration="${DURATION:-}"
           version="${VERSION:-}"
           image="${IMAGE:-}"
+          digest="${DIGEST:-}"
+          warnings="${WARNINGS:-}"
           if [[ -z "$status" ]]; then
             status='n/a'
           fi
@@ -156,6 +162,12 @@ jobs:
           if [[ -z "$image" ]]; then
             image='local'
           fi
+          if [[ -z "$digest" ]]; then
+            digest=''
+          fi
+          if [[ -z "$warnings" ]]; then
+            warnings='0'
+          fi
           duration_json="null"
           if [[ "$duration" =~ ^[0-9]+$ ]]; then
             duration_json="$duration"
@@ -164,8 +176,10 @@ jobs:
             --arg status "$status" \
             --arg version "$version" \
             --arg image "$image" \
+            --arg digest "$digest" \
+            --arg warnings "$warnings" \
             --argjson duration "$duration_json" \
-            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image}' \
+            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image, imageDigest:$digest, warnings:(try ($warnings|tonumber) catch 0)}' \
             > hhfab-summary.json
 
       - name: Upload hhfab summary
@@ -195,6 +209,8 @@ jobs:
           DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
           VERSION: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
           IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
+          DIGEST: ${{ steps.hhfab-smoke.outputs.imageDigest }}
+          WARNINGS: ${{ steps.hhfab-smoke.outputs.warningsCount }}
         run: |
           {
             echo '## hhfab review-kit'
@@ -203,6 +219,8 @@ jobs:
             duration="${DURATION:-}"
             version="${VERSION:-}"
             image="${IMAGE:-local}"
+            digest="${DIGEST:-}"
+            warnings="${WARNINGS:-0}"
             if [[ -z "$status" ]]; then
               status='n/a'
             fi
@@ -215,10 +233,15 @@ jobs:
             if [[ -z "$image" ]]; then
               image='local'
             fi
+            if [[ -z "$digest" ]]; then
+              digest='(n/a)'
+            fi
             echo "- Validation status: ${status}"
             echo "- Duration: ${duration} ms"
             echo "- hhfab version: ${version}"
             echo "- Container image: ${image}"
+            echo "- Image digest: ${digest}"
+            echo "- Warnings: ${warnings}"
             echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -238,6 +261,8 @@ jobs:
       duration-ms: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
       hhfab-version: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
       container-image: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
+      image-digest: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
+      warnings-count: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
@@ -271,6 +296,12 @@ jobs:
             --certificate-identity-regexp='^https://github.com/your-org/.*$' \
             "${HHFAB_IMAGE}"
 
+      - name: Verify hhfab provenance attestation
+        if: github.event.pull_request.head.repo.fork == false && vars.ENABLE_PROVENANCE_VERIFY == 'true'
+        run: |
+          set -Eeuo pipefail
+          cosign verify-attestation --type slsaprovenance "${HHFAB_IMAGE}"
+
       - name: Strict hhfab smoke (containerized)
         if: github.event.pull_request.head.repo.fork == false
         id: strict-container
@@ -278,7 +309,7 @@ jobs:
         with:
           use-container: 'true'
           strict: 'true'
-          container-network: none
+          no-network: 'true'
           container-user: auto
           container-image: ${{ env.HHFAB_IMAGE }}
 
@@ -296,12 +327,16 @@ jobs:
           DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
           VERSION: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
           IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
+          DIGEST: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
+          WARNINGS: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
         run: |
           set -Eeuo pipefail
           status="${STATUS:-}"
           duration="${DURATION:-}"
           version="${VERSION:-}"
           image="${IMAGE:-}"
+          digest="${DIGEST:-}"
+          warnings="${WARNINGS:-}"
           if [[ -z "$status" ]]; then
             status='n/a'
           fi
@@ -311,6 +346,12 @@ jobs:
           if [[ -z "$image" ]]; then
             image='local'
           fi
+          if [[ -z "$digest" ]]; then
+            digest=''
+          fi
+          if [[ -z "$warnings" ]]; then
+            warnings='0'
+          fi
           duration_json="null"
           if [[ "$duration" =~ ^[0-9]+$ ]]; then
             duration_json="$duration"
@@ -319,8 +360,10 @@ jobs:
             --arg status "$status" \
             --arg version "$version" \
             --arg image "$image" \
+            --arg digest "$digest" \
+            --arg warnings "$warnings" \
             --argjson duration "$duration_json" \
-            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image}' \
+            '{status:$status, durationMs:$duration, hhfabVersion:$version, image:$image, imageDigest:$digest, warnings:(try ($warnings|tonumber) catch 0)}' \
             > hhfab-strict-summary.json
 
       - name: Upload hhfab summary (strict)
@@ -350,6 +393,8 @@ jobs:
           DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
           VERSION: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
           IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
+          DIGEST: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
+          WARNINGS: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
         run: |
           {
             echo '## hhfab review-kit (strict)'
@@ -358,6 +403,8 @@ jobs:
             duration="${DURATION:-}"
             version="${VERSION:-}"
             image="${IMAGE:-local}"
+            digest="${DIGEST:-}"
+            warnings="${WARNINGS:-0}"
             if [[ -z "$status" ]]; then
               status='n/a'
             fi
@@ -370,10 +417,15 @@ jobs:
             if [[ -z "$image" ]]; then
               image='local'
             fi
+            if [[ -z "$digest" ]]; then
+              digest='(n/a)'
+            fi
             echo "- Validation status: ${status}"
             echo "- Duration: ${duration} ms"
             echo "- hhfab version: ${version}"
             echo "- Container image: ${image}"
+            echo "- Image digest: ${digest}"
+            echo "- Warnings: ${warnings}"
             echo '_No-network: enabled · Non-root: auto_'
             echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -397,10 +449,11 @@ jobs:
           header: review-kit
           message: |
             **hhfab review-kit summary**
-            - 🧪 Best-effort: `${{ needs.review-kit.result }}` (status: `${{ needs.review-kit.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit.outputs['duration-ms'] || 'n/a' }} ms`)
-            - 🔒 Strict: `${{ needs.review-kit-strict.result }}` (status: `${{ needs.review-kit-strict.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit-strict.outputs['duration-ms'] || 'n/a' }} ms`)
+            - 🧪 Best-effort: `${{ needs.review-kit.result }}` (status: `${{ needs.review-kit.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit.outputs['duration-ms'] || 'n/a' }} ms`, warnings: `${{ needs.review-kit.outputs['warnings-count'] || '0' }}`)
+            - 🔒 Strict: `${{ needs.review-kit-strict.result }}` (status: `${{ needs.review-kit-strict.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit-strict.outputs['duration-ms'] || 'n/a' }} ms`, warnings: `${{ needs.review-kit-strict.outputs['warnings-count'] || '0' }}`)
             - 🧾 hhfab version: `${{ needs.review-kit.outputs['hhfab-version'] || 'n/a' }}` (strict: `${{ needs.review-kit-strict.outputs['hhfab-version'] || 'n/a' }}`)
             - 🐳 Container image: `${{ needs.review-kit-strict.outputs['container-image'] || needs.review-kit.outputs['container-image'] || 'n/a' }}`
+            - 🧬 Image digest: `${{ needs.review-kit-strict.outputs['image-digest'] || needs.review-kit.outputs['image-digest'] || 'n/a' }}`
             - ✅ Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
             - 📦 Artifacts: `review-kit-${{ github.run_id }}` (strict artifact if run: `review-kit-strict-${{ github.run_id }}`)
             - 🔗 Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

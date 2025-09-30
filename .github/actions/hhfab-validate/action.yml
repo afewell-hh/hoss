@@ -18,10 +18,10 @@ inputs:
     description: Fully qualified hhfab container reference.
     required: false
     default: ghcr.io/your-org/hhfab@sha256:1111111111111111111111111111111111111111111111111111111111111111
-  container-network:
-    description: Optional docker network mode (set to none to disable egress)
+  no-network:
+    description: Disable container network access when true
     required: false
-    default: default
+    default: 'false'
   timeout-seconds:
     description: Hard timeout for the validation run (prevents hung jobs)
     required: false
@@ -47,6 +47,12 @@ outputs:
   containerImage:
     description: "Container image reference used (local when empty)"
     value: ${{ steps.hhfab.outputs.containerImage }}
+  imageDigest:
+    description: "Fully qualified image digest used for containerized runs"
+    value: ${{ steps.hhfab.outputs.imageDigest }}
+  warningsCount:
+    description: "Number of warning diagnostics observed during strict evaluation"
+    value: ${{ steps.hhfab.outputs.warningsCount }}
 runs:
   using: composite
   steps:
@@ -91,6 +97,8 @@ runs:
         exit_code=0
         hhfab_version="unknown"
         container_image_used="local"
+        image_digest=""
+        warnings_count=0
         TIMEOUT_HAS_PRESERVE=0
         if command -v timeout >/dev/null 2>&1; then
           if timeout --help 2>&1 | grep -q -- '--preserve-status'; then
@@ -127,17 +135,43 @@ runs:
             user_arg="--user ${_CONTAINER_USER}"
           fi
 
-          if [[ "${{ inputs.container-network }}" == "none" ]]; then
+          if [[ "${{ inputs.no-network }}" == "true" ]]; then
             net_arg="--network=none"
           else
             net_arg=""
           fi
 
           container_image_used="${image}"
+          if ! docker image inspect "${image}" >/dev/null 2>&1; then
+            docker pull "${image}" >/dev/null
+          fi
+          pulled_digest="$(docker image inspect --format='{{index .RepoDigests 0}}' "${image}" 2>/dev/null || true)"
+          if [[ -z "${pulled_digest}" ]]; then
+            echo "Unable to resolve digest for ${image}" >&2
+            exit 1
+          fi
+          if [[ "${pulled_digest}" != "${image}" ]]; then
+            echo "Digest mismatch: expected ${image}, got ${pulled_digest}" >&2
+            exit 1
+          fi
+          image_digest="${pulled_digest}"
+
           docker_base_args=(
-            docker run --rm
-            -v "${wd}:/workspace"
-            -w /workspace
+            docker
+            run
+            --rm
+            --read-only
+            --tmpfs
+            /tmp:rw,noexec,nosuid,size=64m
+            --cap-drop=ALL
+            --security-opt=no-new-privileges
+            --pids-limit=256
+            --memory=512m
+            --cpus=1
+            -v
+            "${wd}:/workspace:rw"
+            -w
+            /workspace
             ${user_arg}
           )
           if [[ -n "${net_arg}" ]]; then
@@ -175,15 +209,13 @@ runs:
 
         if [[ "${_STRICT}" == "true" ]]; then
           if command -v rg >/dev/null 2>&1; then
-            if rg -n --fixed-strings 'warning:' --hidden --no-messages -- 'review-kit.log' >/dev/null 2>&1; then
-              echo "Strict mode: warnings detected" >&2
-              status="warn"
-            fi
+            warnings_count=$(rg --no-heading --hidden --fixed-strings -c 'warning:' review-kit.log 2>/dev/null || echo 0)
           elif [[ -f review-kit.log ]] && command -v grep >/dev/null 2>&1; then
-            if grep -F -n 'warning:' review-kit.log >/dev/null 2>&1; then
-              echo "Strict mode: warnings detected" >&2
-              status="warn"
-            fi
+            warnings_count=$(grep -F -c 'warning:' review-kit.log 2>/dev/null || echo 0)
+          fi
+          if [[ ${warnings_count} -gt 0 ]]; then
+            echo "Strict mode: warnings detected (${warnings_count})" >&2
+            status="warn"
           fi
         fi
 
@@ -200,6 +232,10 @@ runs:
         echo "durationMs=${duration_ms}" >> "$GITHUB_OUTPUT"
         echo "hhfabVersion=${hhfab_version}" >> "$GITHUB_OUTPUT"
         echo "containerImage=${container_image_used}" >> "$GITHUB_OUTPUT"
+        if [[ -n "${image_digest}" ]]; then
+          echo "imageDigest=${image_digest}" >> "$GITHUB_OUTPUT"
+        fi
+        echo "warningsCount=${warnings_count}" >> "$GITHUB_OUTPUT"
 
         if [[ "${status}" == "fail" ]]; then
           if [[ ${exit_code} -eq 0 ]]; then
