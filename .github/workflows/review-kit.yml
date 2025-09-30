@@ -14,20 +14,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  smoke:
+  smoke-local:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-      - name: Run minimal validator stub
+      - name: Run local hhfab validator
         id: run
         uses: ./.github/actions/hhfab-validate
+        with:
+          mode: local
+          matrix: |
+            samples/topology-min.yaml
+            samples/contract-min.json
       - name: Print summary
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          p=".artifacts/review-kit/summary.json"
-          test -f "$p" || { echo "summary missing ($p)"; exit 0; }
-          echo "----- summary.json -----"
-          cat "$p" | sed 's/.*/ &/'
-          echo "------------------------"
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -n "$p" && -f "$p" ]]; then
+            echo "----- summary.json (${p}) -----"
+            sed 's/.*/ &/' "$p"
+            echo "---------------------------------"
+          else
+            echo "summary missing" >&2
+          fi
+  strict:
+    needs: smoke-local
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Run strict hhfab validator
+        id: run
+        uses: ./.github/actions/hhfab-validate
+        with:
+          mode: strict
+          matrix: |
+            samples/topology-min.yaml
+            samples/contract-min.json
+          container-image: ghcr.io/example/hhfab@sha256:TODO
+      - name: Print summary
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -n "$p" && -f "$p" ]]; then
+            echo "----- summary.json (${p}) -----"
+            sed 's/.*/ &/' "$p"
+            echo "---------------------------------"
+          else
+            echo "summary missing" >&2
+          fi
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: review-kit-summary
+          path: ${{ steps.run.outputs.summary_path }}
+          if-no-files-found: warn
