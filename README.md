@@ -19,6 +19,13 @@ Run the validator locally (falls back to strict container in CI):
 MATRIX=$'samples/topology-min.yaml\nsamples/contract-min.json' bash scripts/hhfab-validate.sh || echo "local fallback"
 ```
 
+Or use the convenience make targets:
+
+```bash
+make review-kit
+HHFAB_IMAGE_DIGEST="ghcr.io/your-org/hhfab@sha256:..." make review-kit-strict
+```
+
 ### Reproducing strict locally (no GH needed)
 
 ```bash

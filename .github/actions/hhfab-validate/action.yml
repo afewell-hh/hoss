@@ -45,6 +45,7 @@ runs:
 
         summary_file=.artifacts/review-kit/summary.json
         mkdir -p "$(dirname "$summary_file")"
+        echo "summary_path=${summary_file}" >> "$GITHUB_OUTPUT"
 
         if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
           image="${HHFAB_IMAGE}"
@@ -81,5 +82,3 @@ runs:
         else
           STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" bash "$script"
         fi
-
-        echo "summary_path=${summary_file}" >> "$GITHUB_OUTPUT"

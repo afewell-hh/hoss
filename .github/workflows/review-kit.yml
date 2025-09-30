@@ -21,6 +21,7 @@ jobs:
     continue-on-error: true
     outputs:
       matrix: ${{ steps.read-matrix.outputs.matrix }}
+      strict-needed: ${{ steps.strict-needed.outputs.strict_needed }}
     env:
       HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
@@ -35,6 +36,31 @@ jobs:
           printf "matrix<<'EOF'\n" >> "$GITHUB_OUTPUT"
           sed -e '/^\s*#/d' -e '/^\s*$/d' .github/review-kit/matrix.txt >> "$GITHUB_OUTPUT"
           printf "EOF\n" >> "$GITHUB_OUTPUT"
+      - name: Detect strict-impacting changes
+        if: github.event_name == 'pull_request'
+        id: strict-changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        with:
+          filters: |
+            strict:
+              - 'samples/**'
+              - 'contracts/**'
+      - name: Determine strict requirement
+        id: strict-needed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          STRICT_CHANGED: ${{ steps.strict-changes.outputs.strict }}
+        run: |
+          set -Eeuo pipefail
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
+            echo "strict_needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${STRICT_CHANGED}" == "true" ]]; then
+            echo "strict_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "strict_needed=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Run local hhfab validator
@@ -56,9 +82,19 @@ jobs:
             echo "summary missing" >&2
             exit 0
           fi
-          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -c . "$p"
+          jq -rc '. + {strict:false, image:null}' "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload summary artifact
+        if: always() && steps.run.outputs.summary_path != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: review-kit-summary.json
+          path: ${{ steps.run.outputs.summary_path }}
+          if-no-files-found: warn
+          retention-days: 1
   strict:
     needs: smoke-local
+    if: needs.smoke-local.outputs.strict-needed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -97,11 +133,12 @@ jobs:
             exit 0
           fi
           jq -c . "$p"
-          jq -rc --arg image "${HHFAB_IMAGE_DIGEST}" '. + {image:$image}' "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -rc --arg image "${HHFAB_IMAGE_DIGEST}" '. + {strict:true, image:$image}' "$p" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: review-kit-summary
+          name: review-kit-summary.json
           path: ${{ steps.run.outputs.summary_path }}
           if-no-files-found: warn
+          retention-days: 1
