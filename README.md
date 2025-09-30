@@ -4,6 +4,15 @@
 
 ## Review Kit
 
+**Strict runs need a digest-pinned hhfab image.**  
+Set repo variable `HHFAB_IMAGE_DIGEST` to something like:
+
+```bash
+docker pull ghcr.io/your-org/hhfab:1.2.3
+docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/your-org/hhfab:1.2.3
+# => ghcr.io/your-org/hhfab@sha256:...
+```
+
 Run the validator locally (falls back to strict container in CI):
 
 ```bash

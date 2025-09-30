@@ -17,56 +17,78 @@ jobs:
   smoke-local:
     runs-on: ubuntu-latest
     continue-on-error: true
+    outputs:
+      matrix: ${{ steps.read-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - id: read-matrix
+        run: |
+          set -Eeuo pipefail
+          if [[ ! -f .github/review-kit/matrix.txt ]]; then
+            echo "Matrix file missing (.github/review-kit/matrix.txt)" >&2
+            exit 1
+          fi
+          printf "matrix<<'EOF'\n" >> "$GITHUB_OUTPUT"
+          sed -e '/^\s*#/d' -e '/^\s*$/d' .github/review-kit/matrix.txt >> "$GITHUB_OUTPUT"
+          printf "EOF\n" >> "$GITHUB_OUTPUT"
+      - name: Register hhfab matcher
+        run: echo "::add-matcher::.github/hhfab-problem-matcher.json"
       - name: Run local hhfab validator
         id: run
         uses: ./.github/actions/hhfab-validate
         with:
           mode: local
-          matrix: |
-            samples/topology-min.yaml
-            samples/contract-min.json
+          matrix: ${{ steps.read-matrix.outputs.matrix }}
+      - name: Remove hhfab matcher
+        if: always()
+        run: echo "::remove-matcher owner=hhfab::"
       - name: Print summary
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
           p="${{ steps.run.outputs.summary_path }}"
-          if [[ -n "$p" && -f "$p" ]]; then
-            echo "----- summary.json (${p}) -----"
-            sed 's/.*/ &/' "$p"
-            echo "---------------------------------"
-          else
+          if [[ -z "$p" || ! -f "$p" ]]; then
             echo "summary missing" >&2
+            exit 0
           fi
+          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
   strict:
     needs: smoke-local
     runs-on: ubuntu-latest
+    env:
+      HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Check hhfab image digest is set
+        run: |
+          if [[ -z "${HHFAB_IMAGE_DIGEST}" ]]; then
+            echo "Set repo variable HHFAB_IMAGE_DIGEST to a digest-pinned image (ghcr.io/...@sha256:...)" >&2
+            exit 1
+          fi
+      - name: Register hhfab matcher
+        run: echo "::add-matcher::.github/hhfab-problem-matcher.json"
       - name: Run strict hhfab validator
         id: run
         uses: ./.github/actions/hhfab-validate
         with:
           mode: strict
-          matrix: |
-            samples/topology-min.yaml
-            samples/contract-min.json
-          container-image: ghcr.io/example/hhfab@sha256:TODO
+          matrix: ${{ needs.smoke-local.outputs.matrix }}
+          container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
+      - name: Remove hhfab matcher
+        if: always()
+        run: echo "::remove-matcher owner=hhfab::"
       - name: Print summary
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
           p="${{ steps.run.outputs.summary_path }}"
-          if [[ -n "$p" && -f "$p" ]]; then
-            echo "----- summary.json (${p}) -----"
-            sed 's/.*/ &/' "$p"
-            echo "---------------------------------"
-          else
+          if [[ -z "$p" || ! -f "$p" ]]; then
             echo "summary missing" >&2
+            exit 0
           fi
+          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
