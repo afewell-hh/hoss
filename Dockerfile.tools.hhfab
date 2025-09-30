@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1.6
+
+# Build hhfab from source (replace repository/tag with real source when known)
+FROM golang:1.22-alpine AS build
+RUN apk add --no-cache git build-base
+WORKDIR /src
+# TODO: update to canonical hhfab repository and version tag.
+RUN git clone --depth 1 -b v0.1.0 https://github.com/your-org/hhfab.git .
+RUN CGO_ENABLED=0 go build -o /out/hhfab ./cmd/hhfab
+
+# Minimal runtime image with bash available for validator scripts
+FROM alpine:3.20
+RUN addgroup -S app && adduser -S app -G app -u 65532
+RUN apk add --no-cache bash ca-certificates
+COPY --from=build /out/hhfab /usr/local/bin/hhfab
+USER 65532:65532
+WORKDIR /w
+ENTRYPOINT ["/bin/bash","-lc"]
