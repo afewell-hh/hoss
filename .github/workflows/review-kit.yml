@@ -104,7 +104,11 @@ jobs:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Check hhfab image digest is set
         run: |
-          if [[ -z "${HHFAB_IMAGE_DIGEST:-}" || "${HHFAB_IMAGE_DIGEST}" != *@sha256:* ]]; then
+          if [[ -z "${HHFAB_IMAGE_DIGEST:-}" ]]; then
+            echo "HHFAB_IMAGE_DIGEST is required for strict" >&2
+            exit 1
+          fi
+          if [[ "${HHFAB_IMAGE_DIGEST}" != *@sha256:* ]]; then
             echo "Set repo variable HHFAB_IMAGE_DIGEST to a digest-pinned image ghcr.io/...@sha256:..." >&2
             exit 1
           fi
@@ -118,6 +122,18 @@ jobs:
           matrix: ${{ needs.smoke-local.outputs.matrix }}
           use-container: 'true'
           container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
+      - name: Ensure strict validated targets
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "strict summary missing" >&2
+            exit 1
+          fi
+          jq -e '.strict == true and (.counts.validated // 0) > 0' "$p" >/dev/null \
+            || { echo "strict run had empty matrix or produced no validations" >&2; exit 1; }
       - name: Enforce strict status
         if: always()
         shell: bash
