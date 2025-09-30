@@ -10,12 +10,8 @@ on:
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch: {}
-permissions:
-  contents: read
-  pull-requests: read
-  actions: read
 concurrency:
-  group: review-kit-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 jobs:
   determine-strict:
@@ -27,14 +23,14 @@ jobs:
     outputs:
       require-strict: ${{ steps.evaluate.outputs.require_strict }}
     steps:
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
         id: cf
         with:
           filters: |
             hhfab:
               - 'contracts/**'
               - 'samples/**'
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         id: evaluate
         env:
           PATHS_MATCH: ${{ steps.cf.outputs.hhfab }}
@@ -48,13 +44,13 @@ jobs:
     if: github.event_name == 'pull_request'
     needs: determine-strict
     runs-on: ubuntu-latest
+    name: review-kit (best-effort)
     permissions:
       contents: read
-      pull-requests: read
     env:
       STRICT_REQUIRED: ${{ needs.determine-strict.outputs.require-strict }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Register hhfab problem matcher
         run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
@@ -69,7 +65,7 @@ jobs:
           fi
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: '20'
           cache: 'npm'
@@ -93,13 +89,14 @@ jobs:
 
       - name: Archive review-kit logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
         with:
           name: review-kit-${{ github.run_id }}
           path: |
             **/*.hhfab.log
             **/review-kit/**/report/**/*
-          retention-days: 7
+          retention-days: 3
+          compression-level: 6
           if-no-files-found: ignore
 
       - name: Write run summary
@@ -111,32 +108,20 @@ jobs:
             echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upsert sticky comment
-        if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: review-kit
-          message: |
-            **hhfab review-kit**
-            - Status: ${{ job.status }}
-            - Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
-            - Artifacts: `review-kit-${{ github.run_id }}`
-            - Problem-matcher: `hhfab`
-
   review-kit-strict:
     if: github.event_name == 'pull_request' && needs.determine-strict.outputs.require-strict == 'true'
     needs: determine-strict
     runs-on: ubuntu-latest
+    name: review-kit (strict)
     permissions:
       contents: read
-      pull-requests: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
 
       - name: Register hhfab problem matcher
         run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
         with:
           node-version: '20'
           cache: 'npm'
@@ -149,20 +134,27 @@ jobs:
       - run: npm ci
 
       - name: Show hhfab version (containerized)
+        if: github.event.pull_request.head.repo.fork == false
         run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'hhfab version'
 
       - name: Strict hhfab smoke
+        if: github.event.pull_request.head.repo.fork == false
         run: docker run --rm -v "$PWD:/w" -w /w ghcr.io/your-org/hhfab:latest bash -lc 'scripts/hhfab-smoke.sh'
+
+      - name: Strict hhfab smoke (fork fallback)
+        if: github.event.pull_request.head.repo.fork == true
+        run: bash scripts/hhfab-smoke.sh
 
       - name: Archive review-kit logs (strict)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
         with:
           name: review-kit-strict-${{ github.run_id }}
           path: |
             **/*.hhfab.log
             **/review-kit/**/report/**/*
-          retention-days: 7
+          retention-days: 3
+          compression-level: 6
           if-no-files-found: ignore
 
       - name: Write run summary
@@ -174,24 +166,39 @@ jobs:
             echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  review-kit-comment:
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs:
+      - determine-strict
+      - review-kit
+      - review-kit-strict
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
       - name: Upsert sticky comment
-        if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@v2
+        if: always()
+        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405
         with:
-          header: review-kit-strict
+          header: review-kit
           message: |
-            **hhfab review-kit (strict)**
-            - Status: ${{ job.status }}
-            - Artifacts: `review-kit-strict-${{ github.run_id }}`
-            - Problem-matcher: `hhfab`
+            **hhfab review-kit summary**
+            - 🧪 Best-effort: `${{ needs.review-kit.result }}`
+            - 🔒 Strict: `${{ needs.review-kit-strict.result }}`
+            - ✅ Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
+            - 📦 Artifacts: `review-kit-${{ github.run_id }}` (strict artifact if run: `review-kit-strict-${{ github.run_id }}`)
+            - 🔗 Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   nightly-hhfab:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Register hhfab problem matcher
         run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
       - name: Run nightly review-kit smoke
