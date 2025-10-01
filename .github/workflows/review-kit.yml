@@ -9,6 +9,7 @@ on:
       - 'samples/**'
   schedule:
     - cron: '17 3 * * *'
+  workflow_dispatch: {}
 permissions:
   contents: read
 concurrency:
@@ -85,6 +86,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
+      - name: Bootstrap tools (best-effort)
+        run: bash scripts/tool-bootstrap.sh
       - name: Run local hhfab validator
         id: run
         uses: ./.github/actions/hhfab-validate
