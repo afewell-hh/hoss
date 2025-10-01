@@ -1,0 +1,11 @@
+apiVersion: fabric.hh/v1
+kind: WiringDiagram
+metadata:
+  name: tamper-bad-breakout
+spec:
+  switches:
+    - name: leaf-01
+      model: DS2000
+  connections:
+    - from: leaf-01:50        # 49–52 are uplinks; mapping here should violate server access range
+      to:   server-01:eth0

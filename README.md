@@ -1,4 +1,44 @@
 # hoss
-[![review-kit](https://github.com/afewell-hh/hoss/actions/workflows/review-kit.yml/badge.svg)](./.github/workflows/review-kit.yml) [![review-kit-strict](https://github.com/afewell-hh/hoss/actions/workflows/review-kit.yml/badge.svg?job=review-kit-strict)](./.github/workflows/review-kit.yml)
 
-hoss
+[![review-kit](../../actions/workflows/review-kit.yml/badge.svg)](../../actions/workflows/review-kit.yml)
+[![review-kit nightly](../../actions/workflows/review-kit.yml/badge.svg?event=schedule)](../../actions/workflows/review-kit.yml)
+
+## Review Kit
+
+**Strict runs need a digest-pinned hhfab image.**  
+Set repo variable `HHFAB_IMAGE_DIGEST` to something like:
+
+```bash
+docker pull ghcr.io/your-org/hhfab:1.2.3
+docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/your-org/hhfab:1.2.3
+# => ghcr.io/your-org/hhfab@sha256:...
+```
+
+Run the validator locally (falls back to strict container in CI):
+
+```bash
+MATRIX=$'samples/topology-min.yaml\nsamples/contract-min.json' bash scripts/hhfab-validate.sh || echo "local fallback"
+```
+
+Or use the convenience make targets:
+
+```bash
+make review-kit
+HHFAB_IMAGE_DIGEST="ghcr.io/your-org/hhfab@sha256:..." make review-kit-strict
+```
+
+### Reproducing strict locally (no GH needed)
+
+```bash
+export HHFAB_IMAGE_DIGEST="ghcr.io/your-org/hhfab@sha256:..."
+docker run --rm --network=none --user 65532:65532 \
+  -v "$PWD:/w" -w /w "${HHFAB_IMAGE_DIGEST}" \
+  bash -lc 'set -Eeuo pipefail; hhfab version; bash scripts/hhfab-validate.sh'
+```
+
+The `review-kit` workflow executes two jobs:
+
+- `smoke-local` reuses any available `hhfab` binary on the runner, emits `.artifacts/review-kit/summary.json`, and is allowed to fail without blocking CI. 【F:.github/workflows/review-kit.yml†L23-L43】【F:scripts/hhfab-validate.sh†L1-L61】
+- `strict` launches the validator inside a digest-pinned, no-network, read-only container and uploads the summary artifact for reviewers. 【F:.github/workflows/review-kit.yml†L44-L70】【F:.github/actions/hhfab-validate/action.yml†L1-L79】
+
+Sample fixtures live under `samples/` and are included in the default matrix for both jobs. 【F:samples/topology-min.yaml†L1-L5】【F:samples/contract-min.json†L1-L5】
