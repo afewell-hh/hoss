@@ -4,18 +4,20 @@ on:
     paths:
       - '.github/workflows/**'
       - '.github/actions/**'
+      - '.github/hhfab-problem-matcher.json'
+      - '.github/**/*.yml'
+      - '.github/**/*.yaml'
 permissions:
   contents: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-      - name: Set up Go (for actionlint)
+      - name: Set up Go
         uses: actions/setup-go@4d1edbf9f77cb1be1dfc84a3aa6bce4a0e753135
         with:
           go-version: '1.21'
@@ -26,4 +28,6 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.6.26
           echo "$GOBIN" >> "$GITHUB_PATH"
       - name: Run actionlint
-        run: actionlint -color never
+        run: |
+          set -Eeuo pipefail
+          actionlint -color never

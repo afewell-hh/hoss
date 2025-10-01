@@ -1,0 +1,33 @@
+name: label: enforce-hhfab
+on: [pull_request]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+jobs:
+  label:
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        id: cf
+        with:
+          filters: |
+            hhfab:
+              - 'contracts/**'
+              - 'samples/**'
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        with:
+          script: |
+            const has = ${{ steps.cf.outputs.hhfab == 'true' }};
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.number;
+            const label = 'enforce-hhfab';
+            const labels = (await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number })).data.map(l => l.name);
+            if (has && !labels.includes(label)) {
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [label] });
+            } else if (!has && labels.includes(label)) {
+              await github.rest.issues.removeLabel({ owner, repo, issue_number, name: label }).catch(() => {});
+            }

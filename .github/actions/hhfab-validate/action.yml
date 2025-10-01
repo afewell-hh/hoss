@@ -29,8 +29,7 @@ inputs:
 outputs:
   summary_path:
     description: Path to the generated hhfab summary JSON file
-    value: ${{ steps.run-validator.outputs.summary_path }}
-runs:
+    value: ${{ steps.run-validator.outputs.summary_path }}uns:
   using: composite
   steps:
     - id: run-validator

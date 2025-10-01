@@ -271,7 +271,7 @@ jobs:
             files="(paths-filter reported strict=true but no files were listed)"
           fi
           {
-            echo ''
+            echo ""
             echo '### Changed files (sensitive)'
             echo ''
             printf '```\n%s\n```\n' "${files}"
@@ -288,8 +288,8 @@ jobs:
           fi
           out="${ARTIFACT_DIR}/hhfab.sarif"
           mkdir -p "$(dirname "$out")"
-          jq -n --argjson s "$(cat "$p")" '
-          {
+          jq -n --argjson s "$(cat "$p")" \
+          '{
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
             "version": "2.1.0",
             "runs": [
@@ -303,8 +303,7 @@ jobs:
                 "results": []
               }
             ]
-          }
-          ' > "$out"
+          }' > "$out"
           echo "sarif=$out" >> "$GITHUB_OUTPUT"
       - name: Upload SARIF
         if: always() && steps.sarif.outputs.sarif != ''
