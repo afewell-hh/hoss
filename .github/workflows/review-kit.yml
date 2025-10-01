@@ -38,9 +38,9 @@ jobs:
             echo "Matrix file missing (${MATRIX_FILE})" >&2
             exit 1
           fi
-          printf "matrix<<'EOF'\n" >> "$GITHUB_OUTPUT"
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
           sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "${MATRIX_FILE}" >> "$GITHUB_OUTPUT"
-          printf "EOF\n" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Detect strict-impacting changes
         if: github.event_name == 'pull_request'
         id: strict-changes
