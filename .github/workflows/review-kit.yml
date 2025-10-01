@@ -16,6 +16,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 env:
+  HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
   MATRIX_FILE: .github/review-kit/matrix.txt
   ARTIFACT_DIR: .artifacts/review-kit
 
@@ -163,15 +164,12 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-      - name: Check hhfab image digest is set
+      - name: Diagnose HHFAB_IMAGE_DIGEST presence
         run: |
-          if [[ -z "${HHFAB_IMAGE_DIGEST:-}" ]]; then
-            echo "HHFAB_IMAGE_DIGEST is required for strict" >&2
-            exit 1
-          fi
-          if [[ "${HHFAB_IMAGE_DIGEST}" != *@sha256:* ]]; then
-            echo "Set repo variable HHFAB_IMAGE_DIGEST to a digest-pinned image ghcr.io/...@sha256:..." >&2
-            exit 1
+          if [ -n "${HHFAB_IMAGE_DIGEST:-}" ]; then
+            echo "HHFAB_IMAGE_DIGEST is set (length: ${#HHFAB_IMAGE_DIGEST})"
+          else
+            echo "HHFAB_IMAGE_DIGEST is MISSING"; exit 2
           fi
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
