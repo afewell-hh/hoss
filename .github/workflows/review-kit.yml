@@ -159,10 +159,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
-      HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Check hhfab image digest is set
         run: |
