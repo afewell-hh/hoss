@@ -152,7 +152,7 @@ jobs:
   review_kit_strict:
     name: review-kit (strict)
     needs: smoke-local
-    if: needs['smoke-local'].outputs.strict-needed == 'true'
+    if: needs['smoke-local'].outputs['strict-needed'] == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -262,11 +262,11 @@ jobs:
           fi
           jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Summarize strict-triggering changes
-        if: needs['smoke-local'].outputs.strict-files != ''
+        if: needs['smoke-local'].outputs['strict-files'] != ''
         shell: bash
         run: |
           set -Eeuo pipefail
-          files="${{ needs['smoke-local'].outputs.strict-files }}"
+          files="${{ needs['smoke-local'].outputs['strict-files'] }}"
           if [[ -z "${files}" ]]; then
             files="(paths-filter reported strict=true but no files were listed)"
           fi
