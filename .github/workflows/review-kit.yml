@@ -163,6 +163,8 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Print HHFAB_IMAGE_DIGEST
+        run: echo "HHFAB_IMAGE_DIGEST is ${{ env.HHFAB_IMAGE_DIGEST }}"
       - name: Check hhfab image digest is set
         run: |
           if [[ -z "${HHFAB_IMAGE_DIGEST:-}" ]]; then
