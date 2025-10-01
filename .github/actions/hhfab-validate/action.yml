@@ -32,6 +32,62 @@ outputs:
     value: ${{ steps.run-validator.outputs.summary_path }}runs:
   using: composite
   steps:
-    - name: Echo mode
+    - id: run-validator
+      name: Run validator
       shell: bash
-      run: echo "Mode is ${{ inputs.mode }}"
+      env:
+        HHFAB_MODE: ${{ inputs.mode }}
+        HHFAB_MATRIX: ${{ inputs.matrix }}
+        HHFAB_IMAGE: ${{ inputs["container-image"] }}
+        HHFAB_USE_CONTAINER: ${{ inputs["use-container"] }}
+        HHFAB_SCRIPT: ${{ inputs.script }}
+      run: |
+        set -Eeuo pipefail
+        script="${HHFAB_SCRIPT:-scripts/hhfab-validate.sh}"
+        if [[ ! -x "$script" ]]; then chmod +x "$script"; fi
+
+        summary_file=.artifacts/review-kit/summary.json
+        mkdir -p "$(dirname "$summary_file")"
+        echo "summary_path=${summary_file}" >> "$GITHUB_OUTPUT"
+
+        if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
+          image="${HHFAB_IMAGE}"
+          if [[ "$image" != *@sha256:* ]]; then
+            echo "ERROR: strict mode requires a digest-pinned container image (@sha256:)." >&2
+            exit 1
+          fi
+
+          if [[ "$image" == *"@sha256:TODO"* ]]; then
+            echo "ERROR: strict mode container image digest placeholder must be replaced with a real sha256." >&2
+            exit 1
+          fi
+
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "ERROR: docker CLI is required for strict mode runs." >&2
+            exit 1
+          fi
+
+          mkdir -p "${PWD}/.artifacts"
+
+          docker run --rm \
+            --network=none \
+            --read-only \
+            --user 65532:65532 \
+            --workdir /workspace \
+            --security-opt=no-new-privileges \
+            --pids-limit=128 \
+            --cap-drop=ALL \
+            --tmpfs /tmp:rw,noexec,nosuid,size=65536k \
+            --mount type=bind,source="${PWD}/.artifacts",target=/workspace/.artifacts \
+            -e STRICT=1 \
+            -e MATRIX="${HHFAB_MATRIX}" \
+            -e MODE="strict" \
+            -e HHFAB_IMAGE="${image}" \
+            -e HHFAB_IMAGE_DIGEST="${image}" \
+            -v "${PWD}:/workspace:ro" \
+            "$image" \
+            bash -c "cd /workspace && bash '$script'"
+        else
+          STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" \
+          HHFAB_IMAGE="${HHFAB_IMAGE}" HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE}" bash "$script"
+        fi
