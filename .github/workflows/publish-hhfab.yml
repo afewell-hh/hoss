@@ -1,4 +1,4 @@
-name: publish-hhfab.yml
+name: .github/workflows/publish-hhfab.yml
 
 on:
   workflow_dispatch:
