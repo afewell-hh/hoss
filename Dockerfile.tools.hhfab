@@ -5,8 +5,8 @@ FROM golang:1.22-alpine AS build
 RUN apk add --no-cache git build-base
 WORKDIR /src
 # TODO: update to canonical hhfab repository and version tag.
-RUN git clone --depth 1 -b v0.1.0 https://github.com/your-org/hhfab.git .
-RUN CGO_ENABLED=0 go build -o /out/hhfab ./cmd/hhfab
+RUN git clone --depth 1 https://github.com/afewell-hh/hh-validator.git .
+RUN CGO_ENABLED=0 go build -o /out/hhfab ./cmd
 
 # Minimal runtime image with bash available for validator scripts
 FROM alpine:3.20
