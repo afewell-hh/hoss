@@ -24,8 +24,8 @@ jobs:
     continue-on-error: true
     outputs:
       matrix: ${{ steps.read-matrix.outputs.matrix }}
-      strict-needed: ${{ steps.strict-needed.outputs.strict_needed }}
-      strict-files: ${{ steps.strict-changes.outputs.strict_files }}
+      strict-needed: ${{ steps['strict-needed'].outputs.strict_needed }}
+      strict-files: ${{ steps['strict-changes'].outputs.strict_files }}
     env:
       HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
@@ -57,7 +57,7 @@ jobs:
         id: strict-needed
         env:
           EVENT_NAME: ${{ github.event_name }}
-          STRICT_CHANGED: ${{ steps.strict-changes.outputs.strict }}
+          STRICT_CHANGED: ${{ steps['strict-changes'].outputs.strict }}
         run: |
           set -Eeuo pipefail
           if [[ "${EVENT_NAME}" != "pull_request" ]]; then
@@ -70,11 +70,11 @@ jobs:
             echo "strict_needed=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Summarize strict-triggering changes
-        if: steps.strict-changes.outputs.strict == 'true'
+        if: steps['strict-changes'].outputs.strict == 'true'
         shell: bash
         run: |
           set -Eeuo pipefail
-          files="${{ steps.strict-changes.outputs.strict_files }}"
+          files="${{ steps['strict-changes'].outputs.strict_files }}"
           if [[ -z "${files}" ]]; then
             files="(paths-filter reported strict=true but no files were listed)"
           fi
