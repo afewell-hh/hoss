@@ -56,6 +56,13 @@ runs:
 
         if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
           image="${HHFAB_IMAGE}"
+          # Diagnostic: show runner-side view before starting container
+          echo "== runner diagnostic: PWD = ${PWD} =="
+          ls -la "${PWD}" || true
+          echo "== runner diagnostic: .artifacts contents =="
+          ls -la "${PWD}/.artifacts" || true
+          echo "HHFAB_IMAGE=${image}"
+          echo "HHFAB_IMAGE_DIGEST=${HHFAB_IMAGE_DIGEST:-}${HHFAB_IMAGE:-}" || true
           if [[ "$image" != *@sha256:* ]]; then
             echo "ERROR: strict mode requires a digest-pinned container image (@sha256:)." >&2
             exit 1
