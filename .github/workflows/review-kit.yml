@@ -91,7 +91,7 @@ jobs:
         run: bash scripts/tool-bootstrap.sh
       - name: Run local hhfab validator
         id: run
-        uses: ./.github/actions/hhfab-validate
+        uses: ./.github/actions/hhfab-validate-fixed
         with:
           mode: local
           matrix: ${{ steps.read-matrix.outputs.matrix }}
@@ -175,7 +175,7 @@ jobs:
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Run strict hhfab validator
         id: run
-        uses: ./.github/actions/hhfab-validate
+        uses: ./.github/actions/hhfab-validate-fixed
         with:
           mode: strict
           matrix: ${{ needs['smoke-local'].outputs.matrix }}
