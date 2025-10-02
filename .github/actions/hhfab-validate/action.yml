@@ -93,7 +93,7 @@ runs:
             -e HHFAB_IMAGE="${image}" \
             -e HHFAB_IMAGE_DIGEST="${image}" \
             -v "${PWD}:/workspace:ro" \
-            "$image" \
+            "${image}" \
             bash -c "cd /workspace && bash '$script'"
         else
           # Local execution: make sure environment variables mirror the strict run
