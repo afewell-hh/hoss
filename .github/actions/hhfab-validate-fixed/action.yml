@@ -68,130 +68,128 @@ runs:
             exit 1
           fi
 
-          if [[ "$image" == *"@sha256:TODO"* ]]; then
-            echo "ERROR: strict mode container image digest placeholder must be replaced with a real sha256." >&2
-            exit 1
-          fi
+          name: hhfab validate (fixed)
+          description: Run hhfab validation locally or inside a strict container with JSON summary output.
+          author: HOSS Automation
 
-          if ! command -v docker >/dev/null 2>&1; then
-            echo "ERROR: docker CLI is required for strict mode runs." >&2
-            exit 1
-          fi
+          inputs:
+            script:
+              description: Relative path to the validator script
+              required: false
+              default: scripts/hhfab-validate.sh
+            working-directory:
+              description: Repo subdir to run in
+              required: false
+              default: .
+            mode:
+              description: Select 'local' for host execution or 'strict' for containerized validation
+              required: false
+              default: local
+            matrix:
+              description: Newline-separated list of sample files to validate (defaults inside script)
+              required: false
+              default: ""
+            use-container:
+              description: Set to 'true' to force container execution even if mode is local
+              required: false
+              default: 'false'
+            container-image:
+              description: Digest-pinned hhfab container image to use for strict mode runs
+              required: false
+              default: ghcr.io/example/hhfab@sha256:TODO
 
-          mkdir -p "${PWD}/.artifacts"
+          outputs:
+            summary_path:
+              description: Path to the generated hhfab summary JSON file
+              value: ${{ steps.run-validator.outputs.summary_path }}
 
-          docker run --rm \
-            --network=none \
-            --read-only \
-            --user 65532:65532 \
-            --workdir /workspace \
-            --security-opt=no-new-privileges \
-            --pids-limit=128 \
-            --cap-drop=ALL \
-            --tmpfs /tmp:rw,noexec,nosuid,size=65536k \
-            --mount type=bind,source="${PWD}/.artifacts",target=/workspace/.artifacts \
-            -e STRICT=1 \
-            -e MATRIX="${HHFAB_MATRIX}" \
-            -e MODE="strict" \
-            -e HHFAB_IMAGE="${image}" \
-            -e HHFAB_IMAGE_DIGEST="${image}" \
-            -v "${PWD}:/workspace:ro" \
-            "${image}" \
-            bash -c "cd /workspace && bash '$script'"
-        else
-          STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" \
-          HHFAB_IMAGE="${HHFAB_IMAGE}" HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE}" bash "$script"
-        fi
+          runs:
+            using: composite
+            steps:
+              - id: run-validator
+                name: Run validator
+                shell: bash
+                env:
+                  HHFAB_MODE: ${{ inputs.mode }}
+                  HHFAB_MATRIX: ${{ inputs.matrix }}
+                  HHFAB_IMAGE: ${{ inputs['container-image'] }}
+                  HHFAB_USE_CONTAINER: ${{ inputs['use-container'] }}
+                  HHFAB_SCRIPT: ${{ inputs.script }}
+                run: |
+                  set -Eeuo pipefail
+                  script="${HHFAB_SCRIPT:-scripts/hhfab-validate.sh}"
+                  if [[ ! -x "$script" ]]; then chmod +x "$script"; fi
 
-        if [[ ! -f "$summary_file" ]]; then
-          mkdir -p "$(dirname "$summary_file")"
-          strict_flag=false
-          if [[ "${HHFAB_MODE:-}" == "strict" || "${HHFAB_USE_CONTAINER:-}" == "true" ]]; then
-            strict_flag=true
-          fi
-          cat >"$summary_file" <<EOF
-{
-  "status": "error",
-  "strict": ${strict_flag},
-  "counts": { "validated": 0, "failures": 1, "warnings": 0 },
-  "image": { "digest": "${HHFAB_IMAGE:-}" },
-  "hhfab": { "version": "${HHFAB_TOOL_VERSION:-unknown}" },
-  "note": "Fallback summary: validator did not write summary.json"
-}
-EOF
-        fi
-name: hhfab validate (fixed)
-description: Run hhfab validation locally or inside a strict container with JSON summary output.
-author: HOSS Automation
+                  summary_file=.artifacts/review-kit/summary.json
+                  mkdir -p "$(dirname "$summary_file")"
+                  echo "summary_path=${summary_file}" >> "$GITHUB_OUTPUT"
 
-inputs:
-  script:
-    description: Relative path to the validator script
-    required: false
-    default: scripts/hhfab-validate.sh
-  working-directory:
-    description: Repo subdir to run in
-    required: false
-    default: .
-  mode:
-    description: Select 'local' for host execution or 'strict' for containerized validation
-    required: false
-    default: local
-  matrix:
-    description: Newline-separated list of sample files to validate (defaults inside script)
-    required: false
-    default: ""
-  use-container:
-    description: Set to 'true' to force container execution even if mode is local
-    required: false
-    default: 'false'
-  container-image:
-    description: Digest-pinned hhfab container image to use for strict mode runs
-    required: false
-    default: ghcr.io/example/hhfab@sha256:TODO
+                  if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
+                    image="${HHFAB_IMAGE}"
+                    # Diagnostic: show runner-side view before starting container
+                    echo "== runner diagnostic: PWD = ${PWD} =="
+                    ls -la "${PWD}" || true
+                    echo "== runner diagnostic: .artifacts contents =="
+                    ls -la "${PWD}/.artifacts" || true
+                    echo "HHFAB_IMAGE=${image}"
+                    echo "HHFAB_IMAGE_DIGEST=${HHFAB_IMAGE_DIGEST:-}${HHFAB_IMAGE:-}" || true
+                    if [[ "$image" != *@sha256:* ]]; then
+                      echo "ERROR: strict mode requires a digest-pinned container image (@sha256:)." >&2
+                      exit 1
+                    fi
 
-outputs:
-  summary_path:
-    description: Path to the generated hhfab summary JSON file
-    value: ${{ steps.run-validator.outputs.summary_path }}
+                    if [[ "$image" == *"@sha256:TODO"* ]]; then
+                      echo "ERROR: strict mode container image digest placeholder must be replaced with a real sha256." >&2
+                      exit 1
+                    fi
 
-runs:
-  using: composite
-  steps:
-    - id: run-validator
-      name: Run validator
-      shell: bash
-      env:
-        HHFAB_MODE: ${{ inputs.mode }}
-        HHFAB_MATRIX: ${{ inputs.matrix }}
-        HHFAB_IMAGE: ${{ inputs['container-image'] }}
-        HHFAB_USE_CONTAINER: ${{ inputs['use-container'] }}
-        HHFAB_SCRIPT: ${{ inputs.script }}
-      run: |
-        set -Eeuo pipefail
-        script="${HHFAB_SCRIPT:-scripts/hhfab-validate.sh}"
-        if [[ ! -x "$script" ]]; then chmod +x "$script"; fi
+                    if ! command -v docker >/dev/null 2>&1; then
+                      echo "ERROR: docker CLI is required for strict mode runs." >&2
+                      exit 1
+                    fi
 
-        summary_file=.artifacts/review-kit/summary.json
-        mkdir -p "$(dirname "$summary_file")"
-        echo "summary_path=${summary_file}" >> "$GITHUB_OUTPUT"
+                    mkdir -p "${PWD}/.artifacts"
 
-        if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
-          image="${HHFAB_IMAGE}"
-          if [[ "$image" != *@sha256:* ]]; then
-            echo "ERROR: strict mode requires a digest-pinned container image (@sha256:)." >&2
-            exit 1
-          fi
+                    docker run --rm \
+                      --network=none \
+                      --read-only \
+                      --user 65532:65532 \
+                      --workdir /workspace \
+                      --security-opt=no-new-privileges \
+                      --pids-limit=128 \
+                      --cap-drop=ALL \
+                      --tmpfs /tmp:rw,noexec,nosuid,size=65536k \
+                      --mount type=bind,source="${PWD}/.artifacts",target=/workspace/.artifacts \
+                      -e STRICT=1 \
+                      -e MATRIX="${HHFAB_MATRIX}" \
+                      -e MODE="strict" \
+                      -e HHFAB_IMAGE="${image}" \
+                      -e HHFAB_IMAGE_DIGEST="${image}" \
+                      -v "${PWD}:/workspace:ro" \
+                      "${image}" \
+                      bash -c "cd /workspace && bash '$script'"
+                  else
+                    STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" \
+                    HHFAB_IMAGE="${HHFAB_IMAGE}" HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE}" bash "$script"
+                  fi
 
-          if [[ "$image" == *"@sha256:TODO"* ]]; then
-            echo "ERROR: strict mode container image digest placeholder must be replaced with a real sha256." >&2
-            exit 1
-          fi
-
-          if ! command -v docker >/dev/null 2>&1; then
-            echo "ERROR: docker CLI is required for strict mode runs." >&2
-            exit 1
-          fi
+                  if [[ ! -f "$summary_file" ]]; then
+                    mkdir -p "$(dirname "$summary_file")"
+                    strict_flag=false
+                    if [[ "${HHFAB_MODE:-}" == "strict" || "${HHFAB_USE_CONTAINER:-}" == "true" ]]; then
+                      strict_flag=true
+                    fi
+                    cat >"$summary_file" <<EOF
+          {
+            "status": "error",
+            "strict": ${strict_flag},
+            "counts": { "validated": 0, "failures": 1, "warnings": 0 },
+            "image": { "digest": "${HHFAB_IMAGE:-}" },
+            "hhfab": { "version": "${HHFAB_TOOL_VERSION:-unknown}" },
+            "note": "Fallback summary: validator did not write summary.json"
+          }
+          EOF
+                  fi
 
           mkdir -p "${PWD}/.artifacts"
 
