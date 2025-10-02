@@ -5,27 +5,6 @@ inputs:
   script:
     description: Relative path to the validator script
     required: false
-    default: scripts/hhfab-validate.sh
-  working-directory:
-    description: Repo subdir to run in
-    required: false
-    default: .
-  mode:
-    description: Select 'local' for host execution or 'strict' for containerized validation
-    required: false
-    default: local
-  matrix:
-    description: Newline-separated list of sample files to validate (defaults inside script)
-    required: false
-    default: ""
-  use-container:
-    description: Set to 'true' to force container execution even if mode is local
-    required: false
-    default: 'false'
-  container-image:
-    description: Digest-pinned hhfab container image to use for strict mode runs
-    required: false
-    default: ghcr.io/example/hhfab@sha256:TODO
     name: hhfab validate
     description: Run hhfab validation locally or inside a strict container with JSON summary output.
     author: HOSS Automation
