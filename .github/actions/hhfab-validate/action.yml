@@ -29,7 +29,8 @@ inputs:
 outputs:
   summary_path:
     description: Path to the generated hhfab summary JSON file
-    value: ${{ steps.run-validator.outputs.summary_path }}runs:
+    value: ${{ steps.run-validator.outputs.summary_path }}
+runs:
   using: composite
   steps:
     - id: run-validator
@@ -90,4 +91,25 @@ outputs:
         else
           STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" \
           HHFAB_IMAGE="${HHFAB_IMAGE}" HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE}" bash "$script"
+        fi
+        # Ensure a summary file exists for downstream steps. If the validator
+        # inside the container (or local run) failed to write one, create a
+        # helpful fallback so the workflow can surface the failure and the
+        # image digest that was used.
+        if [[ ! -f "$summary_file" ]]; then
+          mkdir -p "$(dirname "$summary_file")"
+          strict_flag=false
+          if [[ "${HHFAB_MODE:-}" == "strict" || "${HHFAB_USE_CONTAINER:-}" == "true" ]]; then
+            strict_flag=true
+          fi
+          cat >"$summary_file" <<EOF
+{
+  "status": "error",
+  "strict": ${strict_flag},
+  "counts": { "validated": 0, "failures": 1, "warnings": 0 },
+  "image": { "digest": "${HHFAB_IMAGE:-}" },
+  "hhfab": { "version": "${HHFAB_TOOL_VERSION:-unknown}" },
+  "note": "Fallback summary: validator did not write summary.json"
+}
+EOF
         fi
