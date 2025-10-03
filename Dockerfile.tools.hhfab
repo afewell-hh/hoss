@@ -4,8 +4,11 @@
 FROM alpine:3.20 AS installer
 RUN apk add --no-cache bash curl ca-certificates
 ENV BIN_DIR=/usr/local/bin
+# Install oras first (required by hhfab installer)
+RUN curl -fsSL https://i.hhdev.io/oras | bash
+# Now install hhfab
 RUN curl -fsSL https://i.hhdev.io/hhfab | bash
-RUN ls -l /usr/local/bin/hhfab && /usr/local/bin/hhfab --version || /usr/local/bin/hhfab version || echo "Binary installed but version check failed"
+RUN ls -l /usr/local/bin/hhfab && (/usr/local/bin/hhfab --version || /usr/local/bin/hhfab version || echo "Binary installed")
 
 # Minimal runtime image with bash available for validator scripts
 FROM alpine:3.20
