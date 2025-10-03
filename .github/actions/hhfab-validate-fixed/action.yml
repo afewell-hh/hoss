@@ -4,123 +4,89 @@ author: HOSS Automation
 
 inputs:
   working-directory:
-                [[ -s "$SUMMARY" ]] || echo '{"status":"error","strict":'"${STRICT:-false}"',"skipReason":"summary missing"}' > "$SUMMARY"
-                echo "SUMMARY=$SUMMARY" >> "$GITHUB_ENV"
-
     description: Directory to run in
-    name: hhfab validate (fixed)
-    description: Run hhfab validator; emit summary JSON path.
-    author: HOSS Automation
+    required: false
+    default: .
+  use-container:
+    description: '"true" to run inside a digest-pinned container'
+    required: false
+    default: 'false'
+  container-image:
+    description: Digest-pinned image (…@sha256:<64>)
+    required: false
+    default: ''
+  matrix:
+    description: Newline-separated target list
+    required: false
+    default: ''
+  strict:
+    description: Mark strict mode
+    required: false
+    default: 'false'
 
-    inputs:
-      working-directory:
-        description: Directory to run in
-        required: false
-        default: .
-      use-container:
-        description: '"true" to run inside a digest-pinned container'
-        name: hhfab validate (fixed)
-        description: Run hhfab validator; emit summary JSON path.
-        author: HOSS Automation
+outputs:
+  summary_path:
+    description: Path to summary JSON on runner
+    value: ${{ steps.set-output.outputs.summary_path }}
 
-        inputs:
-          working-directory:
-            description: Directory to run in
-            required: false
-            default: .
-          use-container:
-            description: '"true" to run inside a digest-pinned container'
-            required: false
-            name: hhfab validate (fixed)
-            description: Run hhfab validator; emit summary JSON path.
-            author: HOSS Automation
+runs:
+  using: composite
+  steps:
+    - name: Prep artifacts dir
+      shell: bash
+      run: |
+        set -Eeuo pipefail
+        mkdir -p .artifacts/review-kit
 
-            inputs:
-              working-directory:
-                description: Directory to run in
-                required: false
-                default: .
-              use-container:
-                description: '"true" to run inside a digest-pinned container'
-                required: false
-                default: 'false'
-              container-image:
-                description: Digest-pinned image (…@sha256:<64>)
-                required: false
-                default: ''
-              matrix:
-                description: Newline-separated target list
-                required: false
-                default: ''
-              strict:
-                description: Mark strict mode
-                required: false
-                default: 'false'
+    - name: Run validator (local or container)
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        MATRIX: ${{ inputs.matrix }}
+        STRICT: ${{ inputs.strict }}
+      run: |
+        set -Eeuo pipefail
+        SUMMARY=".artifacts/review-kit/summary.json"
+        export SUMMARY
 
-            outputs:
-              summary_path:
-                description: Path to summary JSON on runner
-                value: ${{ steps.set-output.outputs.summary_path }}
+        if [[ "${{ inputs.use-container }}" == "true" ]]; then
+          IMG="${{ inputs.container-image }}"
+          if [[ -z "$IMG" || "$IMG" != *@sha256:* ]]; then
+            echo "Container image must be digest-pinned (@sha256…)" >&2
+            exit 2
+          fi
 
-            runs:
-              using: composite
-              steps:
-                - name: Prep artifacts dir
-                  shell: bash
-                  run: |
-                    set -Eeuo pipefail
-                    mkdir -p .artifacts/review-kit
+          docker run --rm \
+            --network=none \
+            --user "$(id -u):$(id -g)" \
+            --security-opt=no-new-privileges \
+            --read-only \
+            --tmpfs /tmp:rw \
+            -e TMPDIR=/tmp \
+            -e MATRIX \
+            -e STRICT \
+            -e HHFAB_IMAGE \
+            -e HHFAB_IMAGE_DIGEST \
+            -e GITHUB_SHA \
+            -e GITHUB_REF \
+            -e CI=1 \
+            -e MATRIX_FILE=/workspace/.github/review-kit/matrix.txt \
+            -v "$PWD:/workspace:ro" \
+            -v "$PWD/.artifacts:/workspace/.artifacts" \
+            -w /workspace \
+            "$IMG" \
+            bash -lc 'set -Eeuo pipefail; echo "[strict] id: $(id -u):$(id -g)"; echo "[strict] pwd: $(pwd)"; ls -la /workspace/.artifacts || true; if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then echo "[strict] deriving MATRIX from ${MATRIX_FILE}"; MATRIX="$(cat "${MATRIX_FILE})"; fi; echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"; scripts/hhfab-validate.sh || true'
+        else
+          bash scripts/hhfab-validate.sh || true
+        fi
 
-                - name: Run validator (local or container)
-                  id: run
-                  shell: bash
-                  working-directory: ${{ inputs.working-directory }}
-                  env:
-                    MATRIX: ${{ inputs.matrix }}
-                    STRICT: ${{ inputs.strict }}
-                  run: |
-                    set -Eeuo pipefail
-                    SUMMARY=".artifacts/review-kit/summary.json"
-                    export SUMMARY
+        # Ensure we always leave a summary behind
+        [[ -s "$SUMMARY" ]] || echo '{"status":"error","strict":'"${STRICT:-false}"',"skipReason":"summary missing"}' > "$SUMMARY"
+        echo "SUMMARY=$SUMMARY" >> "$GITHUB_ENV"
 
-                    if [[ "${{ inputs.use-container }}" == "true" ]]; then
-                      IMG="${{ inputs.container-image }}"
-                      if [[ -z "$IMG" || "$IMG" != *@sha256:* ]]; then
-                        echo "Container image must be digest-pinned (@sha256…)" >&2
-                        exit 2
-                      fi
-
-                      docker run --rm \
-                        --network=none \
-                        --user "$(id -u):$(id -g)" \
-                        --security-opt=no-new-privileges \
-                        --read-only \
-                        --tmpfs /tmp:rw \
-                        -e TMPDIR=/tmp \
-                        -e MATRIX \
-                        -e STRICT \
-                        -e HHFAB_IMAGE \
-                        -e HHFAB_IMAGE_DIGEST \
-                        -e GITHUB_SHA \
-                        -e GITHUB_REF \
-                        -e CI=1 \
-                        -e MATRIX_FILE=/workspace/.github/review-kit/matrix.txt \
-                        -v "$PWD:/workspace:ro" \
-                        -v "$PWD/.artifacts:/workspace/.artifacts" \
-                        -w /workspace \
-                        "$IMG" \
-                        bash -lc 'set -Eeuo pipefail; echo "[strict] id: $(id -u):$(id -g)"; echo "[strict] pwd: $(pwd)"; ls -la /workspace/.artifacts || true; if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then echo "[strict] deriving MATRIX from ${MATRIX_FILE}"; MATRIX="$(cat "${MATRIX_FILE}")"; fi; echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"; scripts/hhfab-validate.sh || true'
-                    else
-                      bash scripts/hhfab-validate.sh || true
-                    fi
-
-                    # Ensure we always leave a summary behind
-                    [[ -s "$SUMMARY" ]] || echo '{"status":"error","strict":'"${STRICT:-false}"',"skipReason":"summary missing"}' > "$SUMMARY"
-                    echo "SUMMARY=$SUMMARY" >> "$GITHUB_ENV"
-
-                - name: Expose summary path
-                  id: set-output
-                  shell: bash
-                  run: |
-                    echo "summary_path=${SUMMARY:-.artifacts/review-kit/summary.json}" >> "$GITHUB_OUTPUT"
-
+    - name: Expose summary path
+      id: set-output
+      shell: bash
+      run: |
+        echo "summary_path=${SUMMARY:-.artifacts/review-kit/summary.json}" >> "$GITHUB_OUTPUT"
