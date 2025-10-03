@@ -176,6 +176,18 @@ jobs:
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Diagnose checkout & composite
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "::group::Composite head (first 40 lines)"
+          sed -n '1,40p' .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+          echo "::group::Composite sha256"
+          sha256sum .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+          git log -1 --pretty=oneline || true
       - name: Diagnose HHFAB_IMAGE_DIGEST presence
         run: |
           if [ -n "${HHFAB_IMAGE_DIGEST:-}" ]; then
@@ -185,14 +197,14 @@ jobs:
           fi
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
-      - name: Run strict hhfab validator (canary)
+      - name: Validate (strict)
         id: run
-        uses: ./.github/actions/hhfab-validate-canary
+        uses: ./.github/actions/hhfab-validate-fixed
         with:
-          mode: strict
-          matrix: ${{ needs['smoke-local'].outputs.matrix }}
+          strict: 'true'
           use-container: 'true'
           container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
+          matrix: ${{ needs['smoke-local'].outputs.matrix }}
       - name: Ensure strict validated targets
         if: always()
         shell: bash
@@ -259,6 +271,20 @@ jobs:
           fi
           echo "strict validator status=${status}" >&2
           exit 1
+      - name: Enforce summary gate
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          test -s "$p" || { echo "summary.json missing"; exit 10; }
+          jq -e '
+            .status=="ok" and .strict==true and
+            (.counts.validated|tonumber) > 0 and
+            (.counts.warnings|tonumber) == 0 and
+            (.image.digest|test("^.+@sha256:[0-9a-f]{64}$")) and
+            (.hhfab.version != null)
+          ' "$p" >/dev/null
       - name: Remove hhfab matcher
         if: always()
         run: echo "::remove-matcher owner=hhfab::"
