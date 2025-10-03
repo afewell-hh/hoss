@@ -1,4 +1,5 @@
 name: review-kit
+run-name: "review-kit @ ${{ github.sha }}"
 on:
   pull_request:
     paths:
@@ -32,6 +33,17 @@ jobs:
       HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Diagnose checkout & composite
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "::group::Composite head (first 40 lines)"
+          sed -n '1,40p' .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+          echo "::group::Composite sha256"
+          sha256sum .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
       - id: read-matrix
         run: |
           set -Eeuo pipefail
