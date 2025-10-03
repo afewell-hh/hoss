@@ -13,8 +13,8 @@ RUN ls -l /out
 FROM alpine:3.20
 RUN addgroup -S app && adduser -S app -G app -u 65532
 RUN apk add --no-cache bash ca-certificates
-COPY --from=build /out/hhfab /app/hhfab
-RUN ls -l /app
+COPY --from=build /out/hhfab /usr/local/bin/hhfab
+RUN ls -l /usr/local/bin/hhfab
 USER 65532:65532
 WORKDIR /w
 ENTRYPOINT ["/bin/bash","-lc"]
