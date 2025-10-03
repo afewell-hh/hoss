@@ -59,9 +59,11 @@ runs:
 
           docker run --rm \
             --network=none \
-            --user 65532:65532 \
+            --user "$(id -u):$(id -g)" \
             --security-opt=no-new-privileges \
             --read-only \
+            --tmpfs /tmp:rw \
+            -e TMPDIR=/tmp \
             -v "$PWD:/workspace:ro" \
             -v "$PWD/.artifacts:/workspace/.artifacts" \
             -w /workspace \
@@ -70,7 +72,7 @@ runs:
             -e HHFAB_IMAGE="${{ inputs.container-image }}" \
             -e HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE_DIGEST:-}" \
             "$IMG" \
-            bash -lc 'set -Eeuo pipefail; export MATRIX STRICT HHFAB_IMAGE HHFAB_IMAGE_DIGEST; scripts/hhfab-validate.sh || true'
+            bash -lc 'set -Eeuo pipefail; export MATRIX STRICT HHFAB_IMAGE HHFAB_IMAGE_DIGEST TMPDIR; scripts/hhfab-validate.sh || true'
         else
           bash scripts/hhfab-validate.sh || true
         fi
