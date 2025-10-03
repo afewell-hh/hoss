@@ -1,0 +1,34 @@
+name: .github/workflows/publish-hhfab.yml
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push hhfab tool image
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hhfab
+          IMAGE_TAG: v0.1.0
+        run: |
+          set -Eeuo pipefail
+          docker build -f Dockerfile.tools.hhfab -t "${IMAGE_NAME}:${IMAGE_TAG}" .
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+      - name: Print digest for pinning
+        id: digest
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hhfab:v0.1.0
+        run: |
+          set -Eeuo pipefail
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE_NAME}" | awk '/Digest: sha256:/ {print $2; exit}')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+      - name: Show variable hint
+        run: echo "Set HHFAB_IMAGE_DIGEST=ghcr.io/${{ github.repository_owner }}/hhfab@${{ steps.digest.outputs.digest }}"

@@ -1,0 +1,21 @@
+# syntax=docker/dockerfile:1.6
+
+# Install hhfab using the canonical installer
+FROM alpine:3.20 AS installer
+RUN apk add --no-cache bash curl ca-certificates
+ENV BIN_DIR=/usr/local/bin
+# Install oras first (required by hhfab installer)
+RUN curl -fsSL https://i.hhdev.io/oras | bash
+# Now install hhfab
+RUN curl -fsSL https://i.hhdev.io/hhfab | bash
+RUN ls -l /usr/local/bin/hhfab && (/usr/local/bin/hhfab --version || /usr/local/bin/hhfab version || echo "Binary installed")
+
+# Minimal runtime image with bash available for validator scripts
+FROM alpine:3.20
+RUN addgroup -S app && adduser -S app -G app -u 65532
+RUN apk add --no-cache bash ca-certificates
+COPY --from=installer /usr/local/bin/hhfab /usr/local/bin/hhfab
+RUN ls -l /usr/local/bin/hhfab
+USER 65532:65532
+WORKDIR /w
+ENTRYPOINT ["/bin/bash","-lc"]

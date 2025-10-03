@@ -1,475 +1,360 @@
 name: review-kit
+run-name: "review-kit @ ${{ github.sha }}"
 on:
   pull_request:
     paths:
-      - '**/*.ts'
-      - '**/*.tsx'
+      - 'scripts/**'
+      - '.github/actions/**'
+      - '.github/workflows/review-kit.yml'
+      - 'contracts/**'
       - 'samples/**'
-      - 'scripts/hhfab-smoke.sh'
-      - 'REVIEW_KIT_PR13.md'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch: {}
+permissions:
+  contents: read
+  packages: read
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+env:
+  HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+  MATRIX_FILE: .github/review-kit/matrix.txt
+  ARTIFACT_DIR: .artifacts/review-kit
+
 jobs:
-  guard-workflow-pins:
-    if: github.event_name == 'pull_request'
+  smoke-local:
     runs-on: ubuntu-latest
-    name: workflow guard: pinned actions
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-      - name: Ensure workflow actions are pinned
-        run: |
-          set -Eeuo pipefail
-          violations=$(rg -n "^\s*uses:\s*[^@]+@" .github | rg -v '@[0-9a-f]{40}' || true)
-          if [[ -n "$violations" ]]; then
-            echo 'Found unpinned GitHub Actions references:' >&2
-            echo "$violations" >&2
-            exit 1
-          fi
-
-          docker_pattern='docker://'
-          docker_pattern+='[A-Za-z0-9_.\-/]+('
-          docker_pattern+=':[A-Za-z0-9_.\-/]+'
-          docker_pattern+=')?(?!@sha256:)'
-          docker_refs=$(rg --pcre2 -n "$docker_pattern" .github -g '!**/*.md' || true)
-          if [[ -n "$docker_refs" ]]; then
-            echo 'Found docker:// references without pinned digests:' >&2
-            echo "$docker_refs" >&2
-            exit 1
-          fi
-
-          image_pattern='^\s*image:\s+'
-          image_pattern+='[-A-Za-z0-9_./]+'
-          image_pattern+='(:[-A-Za-z0-9_./]+)?(?!@sha256:)'
-          image_refs=$(rg --pcre2 -n "$image_pattern" .github -g '!**/*.md' || true)
-          if [[ -n "$image_refs" ]]; then
-            echo 'Found container image references without pinned digests:' >&2
-            echo "$image_refs" >&2
-            exit 1
-          fi
-
-  determine-strict:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      require-strict: ${{ steps.evaluate.outputs.require_strict }}
-    steps:
-      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
-        id: cf
-        with:
-          filters: |
-            hhfab:
-              - 'contracts/**'
-              - 'samples/**'
-      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
-        id: evaluate
-        env:
-          PATHS_MATCH: ${{ steps.cf.outputs.hhfab }}
-        with:
-          script: |
-            const labels = (context.payload.pull_request?.labels || []).map(label => label.name);
-            const requireStrict = labels.includes('enforce-hhfab') || process.env.PATHS_MATCH === 'true';
-            core.setOutput('require_strict', requireStrict ? 'true' : 'false');
-
-  review-kit:
-    if: github.event_name == 'pull_request'
-    needs:
-      - guard-workflow-pins
-      - determine-strict
-    runs-on: ubuntu-latest
-    name: review-kit (best-effort)
-    permissions:
-      contents: read
-    env:
-      STRICT_REQUIRED: ${{ needs.determine-strict.outputs.require-strict }}
-    outputs:
-      status: ${{ steps.hhfab-smoke.outputs.status }}
-      duration-ms: ${{ steps.hhfab-smoke.outputs.durationMs }}
-      hhfab-version: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
-      container-image: ${{ steps.hhfab-smoke.outputs.containerImage }}
-      image-digest: ${{ steps.hhfab-smoke.outputs.imageDigest }}
-      warnings-count: ${{ steps.hhfab-smoke.outputs.warningsCount }}
-      strict-mode: ${{ steps.hhfab-smoke.outputs.strict }}
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-
-      - name: Register hhfab problem matcher
-        run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
-
-      - name: Ensure PR checklist confirmed (with override)
-        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'maintainer-override')
-        run: |
-          body="$(jq -r '.pull_request.body' "$GITHUB_EVENT_PATH")"
-          if ! echo "$body" | grep -q '\- \[x\] I ran `make review-kit`'; then
-            echo 'Checklist not confirmed.'
-            exit 1
-          fi
-
-      - name: Setup Node
-        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Show tool versions
-        run: |
-          node -v
-          npm -v
-          hhfab version || true
-
-      - run: npm ci
-
-      - name: Lint / Type / Tests
-        run: |
-          npm run lint -- --max-warnings=0
-          npm run typecheck || npx tsc -p tsconfig.json --noEmit
-          npm run test:core || npm test
-
-      - name: hhfab smoke (best-effort)
-        id: hhfab-smoke
-        uses: ./.github/actions/hhfab-validate
-
-      - name: Persist hhfab summary
-        if: always()
-        env:
-          STATUS: ${{ steps.hhfab-smoke.outputs.status }}
-          DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
-          VERSION: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
-          IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
-          DIGEST: ${{ steps.hhfab-smoke.outputs.imageDigest }}
-          WARNINGS: ${{ steps.hhfab-smoke.outputs.warningsCount }}
-          STRICT_FLAG: ${{ steps.hhfab-smoke.outputs.strict }}
-        run: |
-          set -Eeuo pipefail
-          artifact_summary="review-kit-artifacts/hhfab-summary.json"
-          if [[ -f "$artifact_summary" ]]; then
-            cp "$artifact_summary" hhfab-summary.json
-            exit 0
-          fi
-
-          status="${STATUS:-n/a}"
-          duration="${DURATION:-0}"
-          version="${VERSION:-unknown}"
-          image="${IMAGE:-local}"
-          digest="${DIGEST:-}"
-          warnings="${WARNINGS:-0}"
-          strict_flag="${STRICT_FLAG:-false}"
-          if [[ ! "$duration" =~ ^[0-9]+$ ]]; then
-            duration=0
-          fi
-          if [[ ! "$warnings" =~ ^[0-9]+$ ]]; then
-            warnings=0
-          fi
-          jq -n \
-            --arg status "$status" \
-            --arg version "$version" \
-            --arg digest "$digest" \
-            --arg image "$image" \
-            --arg strict "$strict_flag" \
-            --argjson duration "$duration" \
-            --argjson warnings "$warnings" \
-            '{status:$status, durationMs:$duration, hhfabVersion:$version, imageDigest:$digest, containerImage:$image, image:$image, warnings:$warnings, strict:($strict == "true")}' \
-            > hhfab-summary.json
-
-      - name: Upload hhfab summary
-        if: always()
-        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
-        with:
-          name: review-kit-summary-${{ github.run_id }}
-          path: hhfab-summary.json
-          retention-days: 3
-
-      - name: Archive review-kit artifacts
-        if: always()
-        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
-        with:
-          name: review-kit-${{ github.run_id }}
-          path: |
-            review-kit-artifacts/**
-            **/review-kit/**/report/**/*
-          retention-days: 3
-          compression-level: 6
-          if-no-files-found: ignore
-
-      - name: Write run summary
-        if: always()
-        env:
-          STATUS: ${{ steps.hhfab-smoke.outputs.status }}
-          DURATION: ${{ steps.hhfab-smoke.outputs.durationMs }}
-          VERSION: ${{ steps.hhfab-smoke.outputs.hhfabVersion }}
-          IMAGE: ${{ steps.hhfab-smoke.outputs.containerImage }}
-          DIGEST: ${{ steps.hhfab-smoke.outputs.imageDigest }}
-          WARNINGS: ${{ steps.hhfab-smoke.outputs.warningsCount }}
-          STRICT: ${{ steps.hhfab-smoke.outputs.strict }}
-        run: |
-          {
-            echo '## hhfab review-kit'
-            echo "- Strict required: ${STRICT_REQUIRED}"
-            status="${STATUS:-}"
-            duration="${DURATION:-}"
-            version="${VERSION:-}"
-            image="${IMAGE:-local}"
-            digest="${DIGEST:-}"
-            warnings="${WARNINGS:-0}"
-            strict_flag="${STRICT:-false}"
-            if [[ -z "$status" ]]; then
-              status='n/a'
-            fi
-            if [[ -z "$duration" ]]; then
-              duration='n/a'
-            fi
-            if [[ -z "$version" ]]; then
-              version='unknown'
-            fi
-            if [[ -z "$image" ]]; then
-              image='local'
-            fi
-            if [[ -z "$digest" ]]; then
-              digest='(n/a)'
-            fi
-            echo "- Validation status: ${status}"
-            echo "- Duration: ${duration} ms"
-            echo "- hhfab version: ${version}"
-            echo "- Container image: ${image}"
-            echo "- Image digest: ${digest}"
-            echo "- Warnings: ${warnings}"
-            echo "- Strict mode requested: ${strict_flag}"
-            echo "- Summary artifact: review-kit-summary-${GITHUB_RUN_ID}"
-            echo "- Artifacts: review-kit-${GITHUB_RUN_ID}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  review-kit-strict:
-    if: github.event_name == 'pull_request' && needs.determine-strict.outputs.require-strict == 'true'
-    needs:
-      - guard-workflow-pins
-      - determine-strict
-    runs-on: ubuntu-latest
-    name: review-kit (strict)
-    permissions:
-      contents: read
-    env:
-      HHFAB_IMAGE: ghcr.io/your-org/hhfab@sha256:1111111111111111111111111111111111111111111111111111111111111111
-    outputs:
-      status: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
-      duration-ms: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
-      hhfab-version: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
-      container-image: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
-      image-digest: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
-      warnings-count: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
-      strict-mode: ${{ steps.strict-container.outputs.strict || steps.strict-local.outputs.strict }}
-    steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-
-      - name: Register hhfab problem matcher
-        run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
-
-      - uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Show tool versions
-        run: |
-          node -v
-          npm -v
-
-      - run: npm ci
-
-      - name: Install cosign
-        if: github.event.pull_request.head.repo.fork == false
-        uses: sigstore/cosign-installer@1fc5bd9b1c9d6a74d2a4c51e55f66e6f14a4bc71
-        with:
-          cosign-release: 'v2.4.1'
-
-      - name: Verify hhfab container signature
-        if: github.event.pull_request.head.repo.fork == false
-        run: |
-          set -Eeuo pipefail
-          cosign verify \
-            --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
-            --certificate-identity-regexp='^https://github.com/your-org/.*$' \
-            "${HHFAB_IMAGE}"
-
-      - name: Verify hhfab provenance attestation
-        if: github.event.pull_request.head.repo.fork == false && vars.ENABLE_PROVENANCE_VERIFY == 'true'
-        run: |
-          set -Eeuo pipefail
-          cosign verify-attestation --type slsaprovenance "${HHFAB_IMAGE}"
-
-      - name: Strict hhfab smoke (containerized)
-        if: github.event.pull_request.head.repo.fork == false
-        id: strict-container
-        uses: ./.github/actions/hhfab-validate
-        with:
-          use-container: 'true'
-          strict: 'true'
-          no-network: 'true'
-          container-user: auto
-          container-image: ${{ env.HHFAB_IMAGE }}
-
-      - name: Strict hhfab smoke (fork fallback)
-        if: github.event.pull_request.head.repo.fork == true
-        id: strict-local
-        uses: ./.github/actions/hhfab-validate
-        with:
-          strict: true
-
-      - name: Persist hhfab summary (strict)
-        if: always()
-        env:
-          STATUS: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
-          DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
-          VERSION: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
-          IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
-          DIGEST: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
-          WARNINGS: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
-          STRICT_FLAG: ${{ steps.strict-container.outputs.strict || steps.strict-local.outputs.strict }}
-        run: |
-          set -Eeuo pipefail
-          artifact_summary="review-kit-artifacts/hhfab-summary.json"
-          if [[ -f "$artifact_summary" ]]; then
-            cp "$artifact_summary" hhfab-strict-summary.json
-            exit 0
-          fi
-
-          status="${STATUS:-n/a}"
-          duration="${DURATION:-0}"
-          version="${VERSION:-unknown}"
-          image="${IMAGE:-local}"
-          digest="${DIGEST:-}"
-          warnings="${WARNINGS:-0}"
-          strict_flag="${STRICT_FLAG:-true}"
-          if [[ ! "$duration" =~ ^[0-9]+$ ]]; then
-            duration=0
-          fi
-          if [[ ! "$warnings" =~ ^[0-9]+$ ]]; then
-            warnings=0
-          fi
-          jq -n \
-            --arg status "$status" \
-            --arg version "$version" \
-            --arg digest "$digest" \
-            --arg image "$image" \
-            --arg strict "$strict_flag" \
-            --argjson duration "$duration" \
-            --argjson warnings "$warnings" \
-            '{status:$status, durationMs:$duration, hhfabVersion:$version, imageDigest:$digest, containerImage:$image, image:$image, warnings:$warnings, strict:($strict == "true")}' \
-            > hhfab-strict-summary.json
-
-      - name: Upload hhfab summary (strict)
-        if: always()
-        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
-        with:
-          name: review-kit-strict-summary-${{ github.run_id }}
-          path: hhfab-strict-summary.json
-          retention-days: 3
-
-      - name: Archive review-kit artifacts (strict)
-        if: always()
-        uses: actions/upload-artifact@26f96dfa697d77e81fd5907df203aa23a56210a8
-        with:
-          name: review-kit-strict-${{ github.run_id }}
-          path: |
-            review-kit-artifacts/**
-            **/review-kit/**/report/**/*
-          retention-days: 3
-          compression-level: 6
-          if-no-files-found: ignore
-
-      - name: Write run summary
-        if: always()
-        env:
-          STATUS: ${{ steps.strict-container.outputs.status || steps.strict-local.outputs.status }}
-          DURATION: ${{ steps.strict-container.outputs.durationMs || steps.strict-local.outputs.durationMs }}
-          VERSION: ${{ steps.strict-container.outputs.hhfabVersion || steps.strict-local.outputs.hhfabVersion }}
-          IMAGE: ${{ steps.strict-container.outputs.containerImage || steps.strict-local.outputs.containerImage }}
-          DIGEST: ${{ steps.strict-container.outputs.imageDigest || steps.strict-local.outputs.imageDigest }}
-          WARNINGS: ${{ steps.strict-container.outputs.warningsCount || steps.strict-local.outputs.warningsCount }}
-          STRICT: ${{ steps.strict-container.outputs.strict || steps.strict-local.outputs.strict }}
-        run: |
-          {
-            echo '## hhfab review-kit (strict)'
-            echo '- Mode: enforce-hhfab'
-            status="${STATUS:-}"
-            duration="${DURATION:-}"
-            version="${VERSION:-}"
-            image="${IMAGE:-local}"
-            digest="${DIGEST:-}"
-            warnings="${WARNINGS:-0}"
-            strict_flag="${STRICT:-true}"
-            if [[ -z "$status" ]]; then
-              status='n/a'
-            fi
-            if [[ -z "$duration" ]]; then
-              duration='n/a'
-            fi
-            if [[ -z "$version" ]]; then
-              version='unknown'
-            fi
-            if [[ -z "$image" ]]; then
-              image='local'
-            fi
-            if [[ -z "$digest" ]]; then
-              digest='(n/a)'
-            fi
-            echo "- Validation status: ${status}"
-            echo "- Duration: ${duration} ms"
-            echo "- hhfab version: ${version}"
-            echo "- Container image: ${image}"
-            echo "- Image digest: ${digest}"
-            echo "- Warnings: ${warnings}"
-            echo '_No-network: enabled · Non-root: auto_'
-            echo "- Strict flag: ${strict_flag}"
-            echo "- Summary artifact: review-kit-strict-summary-${GITHUB_RUN_ID}"
-            echo "- Artifacts: review-kit-strict-${GITHUB_RUN_ID}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  review-kit-comment:
-    if: ${{ always() && github.event_name == 'pull_request' }}
-    needs:
-      - determine-strict
-      - review-kit
-      - review-kit-strict
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      issues: write
-      pull-requests: write
-    steps:
-      - name: Upsert sticky comment
-        if: always()
-        uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405
-        with:
-          header: review-kit
-          message: |
-            **hhfab review-kit summary**
-            - 🧪 Best-effort: `${{ needs.review-kit.result }}` (status: `${{ needs.review-kit.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit.outputs['duration-ms'] || 'n/a' }} ms`, warnings: `${{ needs.review-kit.outputs['warnings-count'] || '0' }}`)
-            - 🔒 Strict: `${{ needs.review-kit-strict.result }}` (status: `${{ needs.review-kit-strict.outputs.status || 'n/a' }}`, duration: `${{ needs.review-kit-strict.outputs['duration-ms'] || 'n/a' }} ms`, warnings: `${{ needs.review-kit-strict.outputs['warnings-count'] || '0' }}`)
-            - 🛡️ Strict mode flags — best-effort: `${{ needs.review-kit.outputs['strict-mode'] || 'false' }}`, strict job: `${{ needs.review-kit-strict.outputs['strict-mode'] || 'false' }}`
-            - 🧾 hhfab version: `${{ needs.review-kit.outputs['hhfab-version'] || 'n/a' }}` (strict: `${{ needs.review-kit-strict.outputs['hhfab-version'] || 'n/a' }}`)
-            - 🐳 Container image: `${{ needs.review-kit-strict.outputs['container-image'] || needs.review-kit.outputs['container-image'] || 'n/a' }}`
-            - 🧬 Image digest: `${{ needs.review-kit-strict.outputs['image-digest'] || needs.review-kit.outputs['image-digest'] || 'n/a' }}`
-            - ✅ Strict required: `${{ needs.determine-strict.outputs.require-strict }}`
-            - 📦 Artifacts: `review-kit-${{ github.run_id }}` (strict artifact if run: `review-kit-strict-${{ github.run_id }}`)
-            - 🔗 Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  nightly-hhfab:
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
     continue-on-error: true
+    outputs:
+      matrix: ${{ steps.read-matrix.outputs.matrix }}
+      strict-needed: ${{ steps['strict-needed'].outputs.strict_needed }}
+      strict-files: ${{ steps['strict-changes'].outputs.strict_files }}
+    env:
+      HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
-      - name: Register hhfab problem matcher
-        run: echo '::add-matcher::.github/hhfab-problem-matcher.json'
-      - name: Run nightly review-kit smoke
-        run: make review-kit
+      - name: Diagnose checkout & composite
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "::group::Composite head (first 40 lines)"
+          sed -n '1,40p' .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+          echo "::group::Composite sha256"
+          sha256sum .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+      - id: read-matrix
+        run: |
+          set -Eeuo pipefail
+          if [[ ! -f "${MATRIX_FILE}" ]]; then
+            echo "Matrix file missing (${MATRIX_FILE})" >&2
+            exit 1
+          fi
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "${MATRIX_FILE}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Detect strict-impacting changes
+        if: github.event_name == 'pull_request'
+        id: strict-changes
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        with:
+          list-files: shell
+          filters: |
+            strict:
+              - added|modified|deleted:
+                  - 'samples/**'
+                  - 'contracts/**'
+                  - '.github/review-kit/**'
+                  - 'scripts/hhfab-*.sh'
+      - name: Determine strict requirement
+        id: strict-needed
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          STRICT_CHANGED: ${{ steps['strict-changes'].outputs.strict }}
+        run: |
+          set -Eeuo pipefail
+          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
+            echo "strict_needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "${STRICT_CHANGED}" == "true" ]]; then
+            echo "strict_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "strict_needed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Summarize strict-triggering changes
+        if: steps['strict-changes'].outputs.strict == 'true'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          files="${{ steps['strict-changes'].outputs.strict_files }}"
+          if [[ -z "${files}" ]]; then
+            files="(paths-filter reported strict=true but no files were listed)"
+          fi
+          {
+            echo '### Changed files (sensitive)'
+            echo ''
+            printf '```\n%s\n```\n' "${files}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Register hhfab matcher
+        run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
+      - name: Bootstrap tools (best-effort)
+        run: bash scripts/tool-bootstrap.sh
+      - name: Run local hhfab validator
+        id: run
+        uses: ./.github/actions/hhfab-validate-fixed
+        with:
+          mode: local
+          matrix: ${{ steps.read-matrix.outputs.matrix }}
+      - name: Remove hhfab matcher
+        if: always()
+        run: echo "::remove-matcher owner=hhfab::"
+      - name: Print summary
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "summary missing" >&2
+            exit 0
+          fi
+          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Append strict target summary
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            exit 0
+          fi
+          validated=$(jq -r '.counts.validated // 0' "$p")
+          failures=$(jq -r '.counts.failures // 0' "$p")
+          warnings=$(jq -r '.counts.warnings // 0' "$p")
+          digest=$(jq -r '.image.digest // ""' "$p")
+          {
+            echo ""
+            echo "#### Strict target summary"
+            echo ""
+            echo "| validated | failures | warnings |"
+            echo "| --- | --- | --- |"
+            echo "| ${validated} | ${failures} | ${warnings} |"
+            if [[ -n "${digest}" ]]; then
+              echo ""
+              echo "Image digest: ${digest}"
+            fi
+            mapfile -t targets < <(jq -r '.matrix[]?' "$p" | head -n 5)
+            if (( ${#targets[@]} > 0 )); then
+              echo ""
+              echo "<details><summary>Validated targets (first ${#targets[@]} of ${validated})</summary>"
+              echo ""
+              for t in "${targets[@]}"; do
+                echo "- ${t}"
+              done
+              echo ""
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload summary artifact
+        if: always() && steps.run.outputs.summary_path != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: review-kit-summary.json
+          path: ${{ steps.run.outputs.summary_path }}
+          if-no-files-found: warn
+          retention-days: 1
+  review_kit_strict:
+    name: review-kit (strict)
+    needs: smoke-local
+    if: needs['smoke-local'].outputs['strict-needed'] == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Login to GHCR
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+      - name: Diagnose checkout & composite
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          echo "::group::Composite head (first 40 lines)"
+          sed -n '1,40p' .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+          echo "::group::Composite sha256"
+          sha256sum .github/actions/hhfab-validate-fixed/action.yml || true
+          echo "::endgroup::"
+          git log -1 --pretty=oneline || true
+      - name: Diagnose HHFAB_IMAGE_DIGEST presence
+        run: |
+          if [ -n "${HHFAB_IMAGE_DIGEST:-}" ]; then
+            echo "HHFAB_IMAGE_DIGEST is set (length: ${#HHFAB_IMAGE_DIGEST})"
+          else
+            echo "HHFAB_IMAGE_DIGEST is MISSING"; exit 2
+          fi
+      - name: Register hhfab matcher
+        run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
+      - name: Validate (strict)
+        id: run
+        uses: ./.github/actions/hhfab-validate-fixed
+        with:
+          strict: 'true'
+          use-container: 'true'
+          container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
+          matrix: ${{ needs['smoke-local'].outputs.matrix }}
+      - name: Ensure strict validated targets
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "::error::strict summary missing" >&2
+            exit 1
+          fi
+          jq -e '.strict == true and (.counts.validated // 0) > 0' "$p" >/dev/null \
+            || { echo "::error::strict run had empty matrix or produced no validations" >&2; exit 1; }
+      - name: Enforce hhfab minimum version
+        if: always()
+        env:
+          HHFAB_MIN_SEMVER: "0.4.0"
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "::error::strict summary missing" >&2
+            exit 1
+          fi
+          got=$(jq -r '.hhfab.version // empty' "$p")
+          if [[ -z "${got}" ]]; then
+            echo "::error::hhfab version missing from summary" >&2
+            exit 1
+          fi
+          printf '%s\n%s\n' "${HHFAB_MIN_SEMVER}" "${got}" | sort -V | tail -n1 | grep -qx "${got}" || {
+            echo "::error::hhfab ${got} is below required ${HHFAB_MIN_SEMVER}" >&2
+            exit 1
+          }
+      - name: Enforce warning budget
+        if: always()
+        env:
+          WARN_BUDGET: "0"
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "strict summary missing" >&2
+            exit 1
+          fi
+          warns=$(jq -r '.counts.warnings // 0' "$p")
+          echo "warnings=${warns} budget=${WARN_BUDGET}"
+          if [[ "$warns" =~ ^[0-9]+$ ]] && [ "$warns" -le "$WARN_BUDGET" ]; then
+            exit 0
+          fi
+          echo "::error::hhfab warnings (${warns}) exceed budget (${WARN_BUDGET})" >&2
+          exit 1
+      - name: Enforce strict status
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "strict summary missing" >&2
+            exit 1
+          fi
+          status=$(jq -r '.status // "error"' "$p")
+          if [[ "$status" == "ok" ]]; then
+            exit 0
+          fi
+          echo "strict validator status=${status}" >&2
+          exit 1
+      - name: Enforce summary gate
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          test -s "$p" || { echo "summary.json missing"; exit 10; }
+          jq -e '
+            .status=="ok" and .strict==true and
+            (.counts.validated|tonumber) > 0 and
+            (.counts.warnings|tonumber) == 0 and
+            (.image.digest|test("^.+@sha256:[0-9a-f]{64}$")) and
+            (.hhfab.version != null)
+          ' "$p" >/dev/null
+      - name: Remove hhfab matcher
+        if: always()
+        run: echo "::remove-matcher owner=hhfab::"
+      - name: Print summary
+        if: always()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "summary missing" >&2
+            exit 0
+          fi
+          jq -c . "$p" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Summarize strict-triggering changes
+        if: needs['smoke-local'].outputs['strict-files'] != ''
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          files="${{ needs['smoke-local'].outputs['strict-files'] }}"
+          if [[ -z "${files}" ]]; then
+            files="(paths-filter reported strict=true but no files were listed)"
+          fi
+          {
+            echo ""
+            echo '### Changed files (sensitive)'
+            echo ''
+            printf '```\n%s\n```\n' "${files}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Generate SARIF from summary
+        if: always()
+        id: sarif
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.run.outputs.summary_path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "::warning::strict summary missing; skipping SARIF generation" >&2
+            exit 0
+          fi
+          out="${ARTIFACT_DIR}/hhfab.sarif"
+          mkdir -p "$(dirname "$out")"
+          jq -n --argjson s "$(cat "$p")" \
+          '{
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [
+              {
+                "tool": {
+                  "driver": {
+                    "name": "hhfab",
+                    "version": ($s.tool.version // "unknown")
+                  }
+                },
+                "results": []
+              }
+            ]
+          }' > "$out"
+          echo "sarif=$out" >> "$GITHUB_OUTPUT"
+      - name: Upload SARIF
+        if: always() && steps.sarif.outputs.sarif != ''
+        uses: github/codeql-action/upload-sarif@80cb6b56b93de3e779c7d476d9100d06fb87c877
+        with:
+          sarif_file: ${{ steps.sarif.outputs.sarif }}
+          category: hhfab
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: review-kit-summary.json
+          path: ${{ steps.run.outputs.summary_path }}
+          if-no-files-found: warn
+          retention-days: 1
