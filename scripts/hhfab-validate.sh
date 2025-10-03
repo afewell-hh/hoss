@@ -18,11 +18,17 @@ HHFAB_VERSION="$(hhfab --version 2>/dev/null || true)"
 
 set +e
 # Run the usual hhfab commands; capture stdout/stderr to a log in artifacts.
+# Skip if no fab.yaml exists (e.g., when validating individual sample files).
 HHFAB_LOG="${ARTIFACT_DIR}/hhfab-validate.log"
-hhfab init --dev >>"${HHFAB_LOG}" 2>&1
-hhfab vlab gen >>"${HHFAB_LOG}" 2>&1
-hhfab validate >>"${HHFAB_LOG}" 2>&1
-RC=$?
+RC=0
+if [ -f "fab.yaml" ]; then
+	hhfab init --dev >>"${HHFAB_LOG}" 2>&1
+	hhfab vlab gen >>"${HHFAB_LOG}" 2>&1
+	hhfab validate >>"${HHFAB_LOG}" 2>&1
+	RC=$?
+else
+	echo "No fab.yaml found; skipping hhfab validation (matrix-based validation only)" >>"${HHFAB_LOG}"
+fi
 set -e
 
 # Build a minimal summary JSON expected by the workflow. Use HHFAB_MATRIX

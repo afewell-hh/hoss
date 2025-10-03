@@ -64,6 +64,7 @@ runs:
             --read-only \
             --tmpfs /tmp:rw \
             -e TMPDIR=/tmp \
+            -e HHFAB_CACHE_DIR=/tmp/.hhfab-cache \
             -e MATRIX \
             -e STRICT \
             -e HHFAB_IMAGE \
