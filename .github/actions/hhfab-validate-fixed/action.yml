@@ -83,18 +83,7 @@ inputs:
                 -v "$PWD/.artifacts:/workspace/.artifacts" \
                 -w /workspace \
                 "$IMG" \
-                bash -lc 'set -Eeuo pipefail
-        echo "[strict] id: $(id -u):$(id -g)"
-        echo "[strict] pwd: $(pwd)"
-        ls -la /workspace/.artifacts || true
-        # If MATRIX not provided, derive it from the matrix file inside the container
-        if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then
-          echo "[strict] deriving MATRIX from ${MATRIX_FILE}"
-          MATRIX="$(cat "${MATRIX_FILE}")"
-        fi
-        echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"
-        # Run validator; it writes /workspace/.artifacts/review-kit/summary.json
-        scripts/hhfab-validate.sh || true'
+                bash -lc 'set -Eeuo pipefail; echo "[strict] id: $(id -u):$(id -g)"; echo "[strict] pwd: $(pwd)"; ls -la /workspace/.artifacts || true; if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then echo "[strict] deriving MATRIX from ${MATRIX_FILE}"; MATRIX="$(cat "${MATRIX_FILE}")"; fi; echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"; scripts/hhfab-validate.sh || true'
             else
               bash scripts/hhfab-validate.sh || true
             fi
