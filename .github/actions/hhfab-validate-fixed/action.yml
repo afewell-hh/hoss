@@ -64,15 +64,30 @@ runs:
             --read-only \
             --tmpfs /tmp:rw \
             -e TMPDIR=/tmp \
+            -e MATRIX \
+            -e STRICT \
+            -e HHFAB_IMAGE \
+            -e HHFAB_IMAGE_DIGEST \
+            -e GITHUB_SHA \
+            -e GITHUB_REF \
+            -e CI=1 \
+            -e MATRIX_FILE=/workspace/.github/review-kit/matrix.txt \
             -v "$PWD:/workspace:ro" \
             -v "$PWD/.artifacts:/workspace/.artifacts" \
             -w /workspace \
-            -e MATRIX="${MATRIX:-}" \
-            -e STRICT="${STRICT:-}" \
-            -e HHFAB_IMAGE="${{ inputs.container-image }}" \
-            -e HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE_DIGEST:-}" \
             "$IMG" \
-            bash -lc 'set -Eeuo pipefail; export MATRIX STRICT HHFAB_IMAGE HHFAB_IMAGE_DIGEST TMPDIR; scripts/hhfab-validate.sh || true'
+            bash -lc 'set -Eeuo pipefail
+    echo "[strict] id: $(id -u):$(id -g)"
+    echo "[strict] pwd: $(pwd)"
+    ls -la /workspace/.artifacts || true
+    # If MATRIX not provided, derive it from the matrix file inside the container
+    if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then
+      echo "[strict] deriving MATRIX from ${MATRIX_FILE}"
+      MATRIX="$(cat "${MATRIX_FILE}")"
+    fi
+    echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"
+    # Run validator; it writes /workspace/.artifacts/review-kit/summary.json
+    scripts/hhfab-validate.sh || true'
         else
           bash scripts/hhfab-validate.sh || true
         fi
