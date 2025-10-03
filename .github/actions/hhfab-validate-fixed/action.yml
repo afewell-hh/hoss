@@ -65,8 +65,12 @@ runs:
             -v "$PWD:/workspace:ro" \
             -v "$PWD/.artifacts:/workspace/.artifacts" \
             -w /workspace \
+            -e MATRIX="${MATRIX:-}" \
+            -e STRICT="${STRICT:-}" \
+            -e HHFAB_IMAGE="${{ inputs.container-image }}" \
+            -e HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE_DIGEST:-}" \
             "$IMG" \
-            bash -lc 'set -Eeuo pipefail; export MATRIX STRICT; scripts/hhfab-validate.sh || true'
+            bash -lc 'set -Eeuo pipefail; export MATRIX STRICT HHFAB_IMAGE HHFAB_IMAGE_DIGEST; scripts/hhfab-validate.sh || true'
         else
           bash scripts/hhfab-validate.sh || true
         fi
