@@ -76,7 +76,7 @@ runs:
             -v "$PWD/.artifacts:/workspace/.artifacts" \
             -w /workspace \
             "$IMG" \
-            'set -Eeuo pipefail; echo "[strict] id: $(id -u):$(id -g)"; echo "[strict] pwd: $(pwd)"; ls -la /workspace/.artifacts || true; if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then echo "[strict] deriving MATRIX from ${MATRIX_FILE}"; MATRIX="$(cat "${MATRIX_FILE}")"; fi; echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"; scripts/hhfab-validate.sh || true'
+            'set -Eeuo pipefail; echo "[strict] id: $(id -u):$(id -g)"; echo "[strict] pwd: $(pwd)"; ls -la /workspace/.artifacts || true; if [ -z "${MATRIX:-}" ] && [ -f "${MATRIX_FILE}" ]; then echo "[strict] deriving MATRIX from ${MATRIX_FILE}"; MATRIX="$(cat "${MATRIX_FILE}")"; fi; export HHFAB_MATRIX="$MATRIX"; echo "[strict] MATRIX lines: $(printf "%s\n" "${MATRIX:-}" | wc -l)"; scripts/hhfab-validate.sh || true'
         else
           bash scripts/hhfab-validate.sh || true
         fi

@@ -1,19 +1,17 @@
 # syntax=docker/dockerfile:1.6
 
-# Build hhfab from source (replace repository/tag with real source when known)
-FROM golang:1.22-alpine AS build
-RUN apk add --no-cache git build-base bash
-WORKDIR /src
-# TODO: update to canonical hhfab repository and version tag.
-RUN git clone --depth 1 https://github.com/afewell-hh/hh-validator.git .
-RUN CGO_ENABLED=0 go build -o /out/hhfab ./cmd
-RUN ls -l /out
+# Install hhfab using the canonical installer
+FROM alpine:3.20 AS installer
+RUN apk add --no-cache bash curl ca-certificates
+ENV BIN_DIR=/usr/local/bin
+RUN curl -fsSL https://i.hhdev.io/hhfab | bash
+RUN ls -l /usr/local/bin/hhfab && /usr/local/bin/hhfab --version || /usr/local/bin/hhfab version || echo "Binary installed but version check failed"
 
 # Minimal runtime image with bash available for validator scripts
 FROM alpine:3.20
 RUN addgroup -S app && adduser -S app -G app -u 65532
 RUN apk add --no-cache bash ca-certificates
-COPY --from=build /out/hhfab /usr/local/bin/hhfab
+COPY --from=installer /usr/local/bin/hhfab /usr/local/bin/hhfab
 RUN ls -l /usr/local/bin/hhfab
 USER 65532:65532
 WORKDIR /w
