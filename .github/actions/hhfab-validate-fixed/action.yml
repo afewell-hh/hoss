@@ -114,3 +114,122 @@ runs:
 }
 EOF
         fi
+name: hhfab validate (fixed)
+description: Run hhfab validation locally or inside a strict container with JSON summary output.
+author: HOSS Automation
+
+inputs:
+  script:
+    description: Relative path to the validator script
+    required: false
+    default: scripts/hhfab-validate.sh
+  mode:
+    description: Select 'local' for host execution or 'strict' for containerized validation
+    required: false
+    default: local
+  matrix:
+    description: Newline-separated list of sample files to validate (defaults inside script)
+    required: false
+    default: ""
+  use-container:
+    description: Set to 'true' to force container execution even if mode is local
+    required: false
+    default: 'false'
+  container-image:
+    description: Digest-pinned hhfab container image to use for strict mode runs
+    required: false
+    default: ''
+
+outputs:
+  summary_path:
+    description: Path to the generated hhfab summary JSON file
+    value: ${{ steps.run-validator.outputs.summary_path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Prep artifacts dir
+      shell: bash
+      run: mkdir -p .artifacts/review-kit
+
+    - id: run-validator
+      name: Run validator
+      shell: bash
+      env:
+        HHFAB_MODE: ${{ inputs.mode }}
+        HHFAB_MATRIX: ${{ inputs.matrix }}
+        HHFAB_IMAGE: ${{ inputs['container-image'] }}
+        HHFAB_USE_CONTAINER: ${{ inputs['use-container'] }}
+        HHFAB_SCRIPT: ${{ inputs.script }}
+  summary_path:
+    description: Path to the generated hhfab summary JSON file
+    value: ${{ steps.run-validator.outputs.summary_path }}
+      run: |
+        set -Eeuo pipefail
+        script="${HHFAB_SCRIPT:-scripts/hhfab-validate.sh}"
+        if [[ ! -x "$script" ]]; then chmod +x "$script"; fi
+
+        summary_file=$(pwd)/.artifacts/review-kit/summary.json
+        mkdir -p "$(dirname "$summary_file")"
+        echo "summary_path=${summary_file}" >> "$GITHUB_OUTPUT"
+
+        echo "== runner diagnostic: PWD=$(pwd) =="
+        ls -la "$(pwd)" || true
+        echo "== runner diagnostic: .artifacts contents =="
+        ls -la "$(pwd)/.artifacts" || true
+        echo "HHFAB_IMAGE_DIGEST=${HHFAB_IMAGE_DIGEST:-}"
+
+        if [[ "${HHFAB_MODE}" == "strict" || "${HHFAB_USE_CONTAINER}" == "true" ]]; then
+          image="${HHFAB_IMAGE}"
+          if [[ -z "$image" || "$image" != *@sha256:* ]]; then
+            echo "ERROR: strict mode requires a digest-pinned container image (@sha256:)." >&2
+            exit 1
+          fi
+
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "ERROR: docker CLI is required for strict mode runs." >&2
+            exit 1
+          fi
+
+          mkdir -p "$(pwd)/.artifacts"
+
+          docker run --rm \
+            --network=none \
+            --read-only \
+            --user 65532:65532 \
+            --workdir /workspace \
+            --security-opt=no-new-privileges \
+            --pids-limit=128 \
+            --cap-drop=ALL \
+            --tmpfs /tmp:rw,noexec,nosuid,size=65536k \
+            --mount type=bind,source="$(pwd)/.artifacts",target=/workspace/.artifacts \
+            -e STRICT=1 \
+            -e MATRIX="${HHFAB_MATRIX}" \
+            -e MODE="strict" \
+            -e HHFAB_IMAGE="${image}" \
+            -e HHFAB_IMAGE_DIGEST="${image}" \
+            -v "$(pwd):/workspace:ro" \
+            "${image}" \
+            bash -c "cd /workspace && bash '$script'"
+        else
+          STRICT=0 MATRIX="${HHFAB_MATRIX}" MODE="${HHFAB_MODE:-local}" \
+          HHFAB_IMAGE="${HHFAB_IMAGE}" HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE}" bash "$script"
+        fi
+
+        if [[ ! -f "$summary_file" ]]; then
+          mkdir -p "$(dirname "$summary_file")"
+          strict_flag=false
+          if [[ "${HHFAB_MODE:-}" == "strict" || "${HHFAB_USE_CONTAINER:-}" == "true" ]]; then
+            strict_flag=true
+          fi
+          cat >"$summary_file" <<EOF
+{
+  "status": "error",
+  "strict": ${strict_flag},
+  "counts": { "validated": 0, "failures": 1, "warnings": 0 },
+  "image": { "digest": "${HHFAB_IMAGE:-}" },
+  "hhfab": { "version": "${HHFAB_TOOL_VERSION:-unknown}", "tool": "hhfab" },
+  "note": "Fallback summary: validator did not write summary.json"
+}
+EOF
+        fi
