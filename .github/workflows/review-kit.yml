@@ -175,7 +175,7 @@ jobs:
       contents: read
     steps:
       - name: Login to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Diagnose checkout & composite
         shell: bash
