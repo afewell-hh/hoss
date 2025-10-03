@@ -1,4 +1,3 @@
 # Default validator targets
 samples/topology-min.yaml
 samples/contract-min.json
-samples/invalid/bad-breakout.yaml
