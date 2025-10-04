@@ -30,4 +30,4 @@ jobs:
       - name: Run actionlint
         run: |
           set -Eeuo pipefail
-          actionlint -color never
+          actionlint
