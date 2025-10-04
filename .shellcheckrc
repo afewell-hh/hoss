@@ -1,0 +1,8 @@
+# Fail CI only on error-level findings (warnings are allowed)
+severity=error
+
+# Common safe exemptions for our CI environment:
+# SC1091: Sourcing files that aren't present on the runner (tool bootstrap / optional env files)
+disable=SC1091
+# SC2155: Intentional declare+assign in single line in guarded contexts
+disable=SC2155
