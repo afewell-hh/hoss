@@ -10,7 +10,12 @@ on:
       - 'samples/**'
   schedule:
     - cron: '17 3 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      force_fail:
+        description: "Simulate a failure to exercise issue creation"
+        type: boolean
+        default: false
 permissions:
   contents: read
   packages: read
@@ -172,6 +177,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      issues: write
     steps:
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
@@ -197,7 +203,26 @@ jobs:
           fi
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
+      - name: Force-fail summary (dispatch only)
+        if: inputs.force_fail == true
+        id: force-fail
+        run: |
+          set -Eeuo pipefail
+          mkdir -p "${ARTIFACT_DIR}"
+          cat > "${ARTIFACT_DIR}/summary.json" <<'JSON'
+          {
+            "status": "error",
+            "strict": true,
+            "counts": { "validated": 0, "failures": 1, "warnings": 0 },
+            "image": { "digest": "${{ env.HHFAB_IMAGE_DIGEST }}" },
+            "hhfab": { "version": "forced-failure" },
+            "matrix": [],
+            "skipReason": "forced"
+          }
+          JSON
+          echo "summary_path=${ARTIFACT_DIR}/summary.json" >> "$GITHUB_OUTPUT"
       - name: Validate (strict)
+        if: inputs.force_fail != true
         id: run
         uses: ./.github/actions/hhfab-validate-fixed
         with:
@@ -205,12 +230,18 @@ jobs:
           use-container: 'true'
           container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
           matrix: ${{ needs['smoke-local'].outputs.matrix }}
+      - name: Set summary path
+        id: summary
+        if: always()
+        run: |
+          path="${{ steps.force-fail.outputs.summary_path || steps.run.outputs.summary_path }}"
+          echo "path=${path}" >> "$GITHUB_OUTPUT"
       - name: Ensure strict validated targets
         if: always()
         shell: bash
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
             echo "::error::strict summary missing" >&2
             exit 1
@@ -223,7 +254,7 @@ jobs:
           HHFAB_MIN_SEMVER: "0.4.0"
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
             echo "::error::strict summary missing" >&2
             exit 1
@@ -243,7 +274,7 @@ jobs:
           WARN_BUDGET: "0"
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
             echo "strict summary missing" >&2
             exit 1
@@ -260,7 +291,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
             echo "strict summary missing" >&2
             exit 1
@@ -276,7 +307,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           test -s "$p" || { echo "summary.json missing"; exit 10; }
           jq -e '
             .status=="ok" and .strict==true and
@@ -293,7 +324,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
             echo "summary missing" >&2
             exit 0
@@ -319,7 +350,7 @@ jobs:
         id: sarif
         run: |
           set -Eeuo pipefail
-          p="${{ steps.run.outputs.summary_path }}"
+          p="${{ steps.summary.outputs.path }}"
           if [[ -z "$p" || ! -f "$p" ]]; then
             echo "::warning::strict summary missing; skipping SARIF generation" >&2
             exit 0
@@ -354,6 +385,68 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: review-kit-summary.json
-          path: ${{ steps.run.outputs.summary_path }}
+          path: ${{ steps.summary.outputs.path }}
           if-no-files-found: warn
           retention-days: 1
+
+      - name: Create issue on nightly failure
+        if: failure() && (github.event_name == 'schedule' || inputs.force_fail == true)
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUMMARY_PATH: ${{ steps.summary.outputs.path }}
+          BRANCH_REF: ${{ github.ref }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO_UPDATED: ${{ github.event.repository.updated_at }}
+          REPO_FULL: ${{ github.repository }}
+        with:
+          script: |
+            const runUrl = process.env.RUN_URL;
+            const summary = process.env.SUMMARY_PATH;
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-failure,review-kit-strict',
+              state: 'open'
+            });
+
+            const body = "## Strict Validation Failed (Nightly)\n\n" +
+              "**Run:** " + runUrl + "\n" +
+              "**Branch:** `" + process.env.BRANCH_REF + "`\n" +
+              "**Commit:** `" + process.env.COMMIT_SHA + "`\n" +
+              "**Time:** " + process.env.REPO_UPDATED + "\n\n" +
+              "**Summary Path:** `" + summary + "`\n\n" +
+              "### Action Required\n" +
+              "1. Review the [workflow run logs](" + runUrl + ")\n" +
+              "2. Check summary artifact for detailed failure information\n" +
+              "3. Common causes:\n" +
+              "   - hhfab regression upstream\n" +
+              "   - Invalid sample files\n" +
+              "   - Version incompatibility\n\n" +
+              "See the [Review Kit Runbook](https://github.com/" + process.env.REPO_FULL + "/blob/main/docs/runbooks/review-kit.md) for triage procedures.\n\n" +
+              "---\n" +
+              "*Auto-generated by nightly review-kit (strict) failure*";
+
+            if (issues.data.length > 0) {
+              // Append to existing issue
+              const issue = issues.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: "---\n" + body
+              });
+              console.log("Updated issue #" + issue.number);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🔴 Strict validation failed (nightly)',
+                body: body,
+                labels: ['ci-failure', 'review-kit-strict', 'needs-triage']
+              });
+              console.log("Created issue #" + newIssue.data.number);
+            }
