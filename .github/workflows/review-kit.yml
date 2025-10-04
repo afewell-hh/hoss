@@ -24,6 +24,7 @@ concurrency:
   cancel-in-progress: true
 env:
   HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+  COSIGN_VERIFY: ${{ vars.COSIGN_VERIFY || '0' }}
   MATRIX_FILE: .github/review-kit/matrix.txt
   ARTIFACT_DIR: .artifacts/review-kit
 
@@ -166,7 +167,7 @@ jobs:
         if: always() && steps.run.outputs.summary_path != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: review-kit-summary.json
+          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.run.outputs.summary_path }}
           if-no-files-found: warn
           retention-days: 1
@@ -201,6 +202,32 @@ jobs:
           else
             echo "HHFAB_IMAGE_DIGEST is MISSING"; exit 2
           fi
+      - name: Guard HHFAB_IMAGE_DIGEST is digest-pinned
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          case "${HHFAB_IMAGE_DIGEST:-}" in
+            *@sha256:[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\
+[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\
+[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\
+[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) echo "HHFAB_IMAGE_DIGEST must be digest-pinned (@sha256:…)" >&2; exit 3 ;;
+          esac
+      - name: Install cosign
+        if: ${{ env.COSIGN_VERIFY == '1' }}
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+        with:
+          cosign-release: 'v2.2.4'
+      - name: Verify HHFAB image signature
+        if: ${{ env.COSIGN_VERIFY == '1' }}
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          set -Eeuo pipefail
+          cosign verify \
+            --certificate-oidc-issuer-regexp 'https://token.actions.githubusercontent.com' \
+            --certificate-identity-regexp 'https://github.com/afewell-hh/hoss/.*' \
+            "${HHFAB_IMAGE_DIGEST}"
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Force-fail summary (dispatch only)
@@ -384,7 +411,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: review-kit-summary.json
+          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.summary.outputs.path }}
           if-no-files-found: warn
           retention-days: 1
