@@ -1,0 +1,3 @@
+shellcheck:
+  # Only report error-level issues from shellcheck, matching .shellcheckrc policy
+  severity: error
