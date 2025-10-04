@@ -111,7 +111,6 @@ jobs:
         id: run
         uses: ./.github/actions/hhfab-validate-fixed
         with:
-          mode: local
           matrix: ${{ steps.read-matrix.outputs.matrix }}
       - name: Remove hhfab matcher
         if: always()
