@@ -1,3 +1,3 @@
-shellcheck:
-  # Only report error-level issues from shellcheck, matching .shellcheckrc policy
-  severity: error
+# Disable shellcheck integration since we run shellcheck separately
+# with error-only policy via dedicated workflow
+shellcheck: null
