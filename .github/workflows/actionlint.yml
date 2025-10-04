@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Set up Go
-        uses: actions/setup-go@4d1edbf9f77cb1be1dfc84a3aa6bce4a0e753135
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
         with:
           go-version: '1.21'
       - name: Install actionlint
