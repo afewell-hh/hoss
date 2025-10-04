@@ -1,3 +1,12 @@
 # Auto-review for ONF schema goldens
 /samples/**     @afewell-hh/onf-schema @onf-schemas @network-validators
 /contracts/**   @afewell-hh/onf-schema @onf-schemas
+
+# CI/CD pipeline owners (require review for infrastructure changes)
+/.github/workflows/          @afewell-hh
+/.github/actions/            @afewell-hh
+/scripts/hhfab-*.sh          @afewell-hh
+/scripts/tool-bootstrap.sh   @afewell-hh
+/Dockerfile.tools.*          @afewell-hh
+/.github/review-kit/         @afewell-hh
+/protection.json             @afewell-hh
