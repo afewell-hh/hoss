@@ -166,7 +166,7 @@ jobs:
         if: always() && steps.run.outputs.summary_path != ''
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: review-kit-summary.json
+          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.run.outputs.summary_path }}
           if-no-files-found: warn
           retention-days: 1
@@ -384,7 +384,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: review-kit-summary.json
+          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.summary.outputs.path }}
           if-no-files-found: warn
           retention-days: 1
