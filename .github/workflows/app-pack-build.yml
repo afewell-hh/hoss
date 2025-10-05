@@ -106,7 +106,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 
       - name: Install cosign
-        uses: sigstore/cosign-installer@3454569cb0e741661d58b7a61e9bf7bc36a86235  # v3.8.1
+        uses: sigstore/cosign-installer@053f9b74638557590800a301da1ba82351507e2c  # v3.8.1
 
       - name: Build App Pack
         run: make app-pack-build
