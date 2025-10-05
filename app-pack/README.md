@@ -9,6 +9,28 @@ HOSS App Pack is a signed, portable bundle that installs on any Demon instance v
 **Version:** 0.1.0
 **License:** Apache-2.0
 **Repository:** https://github.com/afewell-hh/hoss
+**Status:** ✅ Ready for Day 7 Integration (Sprint Wave A)
+
+## Sprint Wave A Progress
+
+**Deliverables:** 10/12 Complete (83%)
+- ✅ App Pack structure
+- ✅ JSON Schema contracts
+- ✅ Capsule integration
+- ✅ Ritual & UI manifests
+- ✅ hossctl CLI
+- ✅ Build infrastructure
+- ✅ CI workflow
+- ✅ Documentation
+- ✅ Validation & testing
+- ✅ Security review
+- ⏳ Integration testing (Day 7)
+- ⏳ E2E validation (Days 8-10)
+
+**Documentation:**
+- 📋 [Integration Test Scenarios](../docs/INTEGRATION-TESTS.md)
+- 🔒 [Security Review](../docs/SECURITY-REVIEW.md)
+- 🔧 [Container-Exec Requirements](../docs/CONTAINER-EXEC-REQUIREMENTS.md)
 
 ## What's Included
 
