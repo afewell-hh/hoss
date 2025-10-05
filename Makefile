@@ -1,6 +1,6 @@
 .PHONY: review-kit review-kit-strict bundle/preview bundle/check bundle/verify bundle/keys \
 	hossctl hossctl-build hossctl-install hossctl-test \
-	app-pack app-pack-build app-pack-sign app-pack-test
+	app-pack app-pack-build app-pack-sign app-pack-test app-pack-validate-contracts
 
 review-kit:
 	@bash scripts/hhfab-validate.sh
@@ -102,3 +102,7 @@ app-pack-test:
 	@test -f app-pack/rituals/hoss-validate.yaml || { echo "Missing hoss-validate.yaml"; exit 1; }
 	@test -f app-pack/ui/cards/hoss-validate.card.yaml || { echo "Missing hoss-validate.card.yaml"; exit 1; }
 	@echo "✅ App Pack structure validated"
+
+app-pack-validate-contracts:
+	@echo "Validating JSON contracts..."
+	@bash scripts/validate-contracts.sh
