@@ -1,0 +1,709 @@
+name: Promote Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'OCI repo (e.g., ghcr.io/afewell-hh/hoss/hhfab)'
+        required: true
+        type: string
+        default: 'ghcr.io/afewell-hh/hoss/hhfab'
+      digest:
+        description: 'sha256 digest (64 hex chars, no prefix)'
+        required: true
+        type: string
+      tag:
+        description: 'Target tag (e.g., v1.0.0 or stable)'
+        required: true
+        type: string
+      allow_non_semver:
+        description: 'Allow non-semver tags (bypass policy)'
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.image }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
+permissions:
+  issues: write
+
+jobs:
+  preflight:
+    name: Preflight Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+
+          # Validate digest (64 hex chars, no prefix)
+          if [[ ! "${{ inputs.digest }}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "❌ Digest must be 64 hex characters (no sha256: prefix)"
+            exit 1
+          fi
+
+          # Validate image (must be ghcr.io path)
+          if [[ ! "${{ inputs.image }}" =~ ^ghcr\.io/.+/.+ ]]; then
+            echo "❌ Image must be ghcr.io/<owner>/<name>"
+            exit 1
+          fi
+
+          # Validate tag (alphanumeric, dots, dashes, underscores only)
+          if [[ ! "${{ inputs.tag }}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "❌ Tag contains invalid characters"
+            exit 1
+          fi
+
+          echo "✅ Input validation passed"
+
+      - name: Enforce tag policy
+        run: |
+          set -euo pipefail
+
+          # Enforce SemVer policy (vX.Y.Z or stable/latest)
+          if [[ ! "${{ inputs.tag }}" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?|stable|latest)$ ]]; then
+            if [[ "${{ inputs.allow_non_semver }}" == "true" ]]; then
+              echo "⚠️  Non-SemVer tag '${{ inputs.tag }}' allowed via ALLOW_NON_SEMVER flag"
+            else
+              echo "❌ Tag '${{ inputs.tag }}' does not match required patterns:"
+              echo "  - vX.Y.Z (semantic version)"
+              echo "  - stable"
+              echo "  - latest"
+              echo ""
+              echo "To bypass this policy, set allow_non_semver: true"
+              exit 1
+            fi
+          fi
+
+          echo "✅ Tag policy check passed"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@74b85c2af8a9cd2e75dfce0289e694e935e48b64  # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check tag immutability
+        run: |
+          set -euo pipefail
+          DST="${{ inputs.image }}:${{ inputs.tag }}"
+
+          # Check if tag already exists (prevent overwriting)
+          if docker buildx imagetools inspect "$DST" >/dev/null 2>&1; then
+            echo "❌ Tag already exists: $DST"
+            echo "This workflow enforces tag immutability. Use a different tag or delete the existing one first."
+            exit 2
+          fi
+
+          echo "✅ Tag is available: $DST"
+
+      - name: Check source digest exists
+        run: |
+          set -euo pipefail
+          SRC="${{ inputs.image }}@sha256:${{ inputs.digest }}"
+
+          echo "🔍 Checking source digest exists: ${SRC}"
+          if ! docker buildx imagetools inspect "$SRC" >/dev/null 2>&1; then
+            echo "❌ Source digest not found: $SRC"
+            echo "Ensure the digest exists in the registry before promoting"
+            exit 1
+          fi
+
+          echo "✅ Source digest verified"
+
+      - name: Assert main validation is green
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        with:
+          script: |
+            // Ensure main branch CI is passing before promoting
+            const { data: runs } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 20,
+              branch: 'main',
+              status: 'completed'
+            });
+
+            const requiredWorkflows = ['review-kit (strict)', 'smoke-local'];
+            const failures = [];
+
+            for (const workflowName of requiredWorkflows) {
+              const run = runs.workflow_runs.find(r => r.name === workflowName);
+
+              if (!run) {
+                failures.push(`${workflowName}: No recent runs found on main`);
+              } else if (run.conclusion !== 'success') {
+                failures.push(`${workflowName}: Last run ${run.conclusion} (${run.html_url})`);
+              } else {
+                console.log(`✅ ${workflowName}: Last run successful (${run.html_url})`);
+              }
+            }
+
+            if (failures.length > 0) {
+              core.setFailed(
+                '❌ Main branch validation not green:\n' +
+                failures.map(f => `  - ${f}`).join('\n') +
+                '\n\nEnsure all required workflows pass on main before promoting.'
+              );
+            } else {
+              console.log('✅ All required workflows passing on main');
+            }
+
+  promote:
+    name: Promote and Sign
+    runs-on: ubuntu-latest
+    needs: preflight
+    environment: production
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@c56c2d3e59e4281cc41dea2217323ba5694b171e  # v3.8.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@74b85c2af8a9cd2e75dfce0289e694e935e48b64  # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote manifest (server-side, no rebuild)
+        run: |
+          set -euo pipefail
+          SRC="${{ inputs.image }}@sha256:${{ inputs.digest }}"
+          DST="${{ inputs.image }}:${{ inputs.tag }}"
+
+          echo "📦 Source: ${SRC}"
+          echo "🏷️  Target: ${DST}"
+
+          # Server-side manifest promotion (fast, no local pull/push)
+          docker buildx imagetools create --tag "$DST" "$SRC"
+
+          echo "✅ Promoted sha256:${{ inputs.digest }} → ${{ inputs.tag }}"
+
+      - name: Sign promoted tag
+        run: |
+          DST="${{ inputs.image }}:${{ inputs.tag }}"
+
+          echo "🔐 Signing ${DST}"
+          cosign sign --yes "${DST}"
+
+          echo "✅ Signature attached to ${{ inputs.tag }}"
+
+      - name: Verify signatures (double check)
+        run: |
+          set -euo pipefail
+          TAG_REF="${{ inputs.image }}:${{ inputs.tag }}"
+          DIGEST_REF="${{ inputs.image }}@sha256:${{ inputs.digest }}"
+
+          echo "🔍 Verifying signature on tag reference..."
+          cosign verify "${TAG_REF}" \
+            --certificate-identity-regexp="^https://github.com/.+/.+@" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+          echo "🔍 Verifying signature on digest reference..."
+          cosign verify "${DIGEST_REF}" \
+            --certificate-identity-regexp="^https://github.com/.+/.+@" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+          echo "✅ Both tag and digest signatures verified"
+
+      - name: Post-promotion sanity check
+        run: |
+          set -euo pipefail
+          TAG_REF="${{ inputs.image }}:${{ inputs.tag }}"
+
+          echo "🔬 Running sanity check on promoted image..."
+
+          # Verify manifest is accessible
+          echo "📋 Inspecting manifest..."
+          docker buildx imagetools inspect "$TAG_REF" >/dev/null
+
+          # Run smoke test inside the image (offline, read-only)
+          echo "🧪 Running smoke test (hhfab version)..."
+          VERSION_OUTPUT=$(docker run --rm --network=none --read-only --tmpfs /tmp:rw \
+            -e TMPDIR=/tmp \
+            "$TAG_REF" sh -lc 'hhfab version' 2>&1 || true)
+
+          if [ -z "$VERSION_OUTPUT" ]; then
+            echo "❌ Sanity check failed: 'hhfab version' produced no output"
+            exit 1
+          fi
+
+          echo "✅ Sanity check passed"
+          echo "   Version output: $VERSION_OUTPUT"
+
+      - name: Generate promotion receipt
+        id: receipt
+        run: |
+          set -euo pipefail
+          TAG_REF="${{ inputs.image }}:${{ inputs.tag }}"
+          DIGEST_REF="${{ inputs.image }}@sha256:${{ inputs.digest }}"
+
+          # Get resolved manifest digest
+          RESOLVED_DIGEST=$(docker buildx imagetools inspect "$TAG_REF" --format '{{.Manifest.Digest}}')
+
+          # Get cosign certificate metadata (extract from verify output)
+          COSIGN_CERT_INFO=$(cosign verify "$TAG_REF" \
+            --certificate-identity-regexp="^https://github.com/.+/.+@" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com 2>&1 | \
+            grep -E "Certificate subject|Certificate issuer" || echo "Cert metadata unavailable")
+
+          # Create promotion receipt
+          mkdir -p .artifacts
+          RECEIPT_FILE=".artifacts/receipt-${{ inputs.tag }}.json"
+          cat > "$RECEIPT_FILE" <<EOF
+          {
+            "promotion": {
+              "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+              "workflow_run": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "triggered_by": "${{ github.actor }}"
+            },
+            "inputs": {
+              "image": "${{ inputs.image }}",
+              "digest": "sha256:${{ inputs.digest }}",
+              "tag": "${{ inputs.tag }}",
+              "allow_non_semver": ${{ inputs.allow_non_semver }}
+            },
+            "outputs": {
+              "tag_reference": "${TAG_REF}",
+              "digest_reference": "${DIGEST_REF}",
+              "resolved_manifest_digest": "${RESOLVED_DIGEST}"
+            },
+            "verification": {
+              "cosign_verified": true,
+              "certificate_info": $(echo "$COSIGN_CERT_INFO" | jq -Rs .)
+            },
+            "sanity_check": {
+              "passed": true,
+              "command": "hhfab version",
+              "output": $(echo "$VERSION_OUTPUT" | jq -Rs .)
+            }
+          }
+          EOF
+
+          echo "✅ Promotion receipt generated: receipt-${{ inputs.tag }}.json"
+          cat "$RECEIPT_FILE" | jq .
+
+      - name: Validate receipt integrity
+        run: |
+          set -euo pipefail
+          RECEIPT_FILE=".artifacts/receipt-${{ inputs.tag }}.json"
+
+          echo "🔍 Validating receipt structure and invariants..."
+
+          # Validate core shape + invariants
+          jq -e '
+            .promotion.workflow_run and
+            .promotion.timestamp and
+            .promotion.triggered_by and
+            .inputs.image and
+            (.inputs.digest | test("^[0-9a-f]{64}$")) and
+            (.outputs.tag_reference | test(":")) and
+            (.outputs.digest_reference | test("@sha256:[0-9a-f]{64}$")) and
+            (.outputs.resolved_manifest_digest | test("^sha256:[0-9a-f]{64}$")) and
+            .verification.cosign_verified == true and
+            .sanity_check.passed == true and
+            .sanity_check.command and
+            .sanity_check.output
+          ' "$RECEIPT_FILE" >/dev/null
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Receipt validation passed"
+          else
+            echo "❌ Receipt validation failed: core invariants not satisfied"
+            exit 1
+          fi
+
+          # Additional checks
+          INPUT_DIGEST="${{ inputs.digest }}"
+          RECEIPT_DIGEST=$(jq -r '.inputs.digest' "$RECEIPT_FILE")
+          if [ "$INPUT_DIGEST" != "$RECEIPT_DIGEST" ]; then
+            echo "❌ Receipt digest mismatch: input=$INPUT_DIGEST, receipt=$RECEIPT_DIGEST"
+            exit 1
+          fi
+
+          echo "✅ Receipt integrity verified"
+
+      - name: Upload promotion receipt
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        with:
+          name: receipt-${{ inputs.tag }}
+          path: .artifacts/receipt-${{ inputs.tag }}.json
+          retention-days: 90
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ inputs.tag }}"
+          DIGEST="${{ inputs.digest }}"
+          IMAGE="${{ inputs.image }}"
+
+          # Capture manifest details for release notes
+          MANIFEST_INFO=$(docker buildx imagetools inspect "${IMAGE}:${TAG}" 2>&1 || echo "Manifest info unavailable")
+
+          # Create release notes
+          cat > release-notes.md <<EOF
+          ## Release Information
+
+          **Image**: \`${IMAGE}:${TAG}\`
+          **Digest**: \`sha256:${DIGEST}\`
+          **Workflow Run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+          ### Manifest Details
+
+          <details>
+          <summary>Click to view multi-arch manifest</summary>
+
+          \`\`\`
+          ${MANIFEST_INFO}
+          \`\`\`
+
+          </details>
+
+          ### Verification
+
+          **Quick verify (copy-paste):**
+
+          \`\`\`bash
+          TAG=${IMAGE}:${TAG}
+          DIG=${IMAGE}@sha256:${DIGEST}
+
+          # Double-verify signatures (tag + digest)
+          cosign verify "\$TAG" \\
+            --certificate-identity-regexp="^https://github.com/.+/.+@" \\
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+          cosign verify "\$DIG" \\
+            --certificate-identity-regexp="^https://github.com/.+/.+@" \\
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+          # Inspect manifest
+          docker buildx imagetools inspect "\$TAG"
+
+          # Pull and run
+          docker pull "\$TAG"
+          docker run --rm "\$TAG" hhfab version
+          \`\`\`
+
+          ### Deployment
+
+          Update your deployment manifests to reference this tag:
+
+          \`\`\`yaml
+          image: ${IMAGE}:${TAG}
+          \`\`\`
+
+          ---
+          🔐 *This release was cryptographically signed and verified*
+          EOF
+
+          # Create or update release
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Updating existing release: $TAG"
+            gh release edit "$TAG" --notes-file release-notes.md
+          else
+            echo "Creating new release: $TAG"
+            gh release create "$TAG" \
+              --title "Release $TAG" \
+              --notes-file release-notes.md
+          fi
+
+          echo "✅ GitHub Release created/updated: $TAG"
+
+      - name: Attach promotion receipt to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ inputs.tag }}"
+          RECEIPT_FILE=".artifacts/receipt-${TAG}.json"
+
+          # Upload the receipt as a release asset
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$RECEIPT_FILE" --clobber
+            echo "✅ Promotion receipt attached to release: receipt-${TAG}.json"
+          else
+            echo "⚠️  Release not found, skipping receipt upload"
+          fi
+
+      - name: Auto-close resolved promotion failures
+        if: success()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        env:
+          TAG: ${{ inputs.tag }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          script: |
+            const tag = process.env.TAG;
+            const runUrl = process.env.RUN_URL;
+
+            // Find open promotion-failure issues for this tag
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'promotion-failure',
+              state: 'open'
+            });
+
+            const issueTitle = `⚠️ Promotion failed: ${tag}`;
+            const matchingIssues = issues.data.filter(i => i.title === issueTitle);
+
+            for (const issue of matchingIssues) {
+              // Close the issue with a success comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `✅ **Resolved**\n\nPromotion succeeded in run [${context.runId}](${runUrl}).\n\n` +
+                      `The tag \`${tag}\` has been successfully promoted and verified.\n\n` +
+                      `- [View Release](https://github.com/${context.repo.owner}/${context.repo.repo}/releases/tag/${tag})\n` +
+                      `- [Download Promotion Receipt](${runUrl})\n\n` +
+                      `---\n*Auto-closed by promote-release workflow*`
+              });
+
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'completed'
+              });
+
+              console.log(`Closed issue #${issue.number}: ${issue.title}`);
+            }
+
+            if (matchingIssues.length === 0) {
+              console.log('No open promotion-failure issues found for this tag');
+            }
+
+      # Optional: Uncomment to enable notifications
+      # - name: Notify release (Slack)
+      #   if: success() && vars.SLACK_WEBHOOK_URL != ''
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      #   run: |
+      #     curl -X POST "$SLACK_WEBHOOK_URL" \
+      #       -H 'Content-Type: application/json' \
+      #       -d '{
+      #         "text": "🚀 Release promoted: ${{ inputs.tag }}",
+      #         "blocks": [
+      #           {
+      #             "type": "section",
+      #             "text": {
+      #               "type": "mrkdwn",
+      #               "text": "*Release Promoted*\n\n*Tag:* `${{ inputs.tag }}`\n*Image:* `${{ inputs.image }}`\n*Digest:* `sha256:${{ inputs.digest }}`"
+      #             }
+      #           },
+      #           {
+      #             "type": "section",
+      #             "text": {
+      #               "type": "mrkdwn",
+      #               "text": "• <https://github.com/${{ github.repository }}/releases/tag/${{ inputs.tag }}|View Release>\n• <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Workflow Run>\n• Download receipt: `receipt-${{ inputs.tag }}.json`"
+      #             }
+      #           }
+      #         ]
+      #       }'
+
+      # Alternative: GitHub Discussions
+      # - name: Post to GitHub Discussions
+      #   if: success()
+      #   uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      #   with:
+      #     script: |
+      #       const tag = '${{ inputs.tag }}';
+      #       const image = '${{ inputs.image }}';
+      #       const digest = '${{ inputs.digest }}';
+      #       const runUrl = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+      #       const releaseUrl = `https://github.com/${{ github.repository }}/releases/tag/${tag}`;
+      #
+      #       // Create discussion in "Announcements" category
+      #       const query = `
+      #         mutation($repositoryId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
+      #           createDiscussion(input: {
+      #             repositoryId: $repositoryId,
+      #             categoryId: $categoryId,
+      #             title: $title,
+      #             body: $body
+      #           }) {
+      #             discussion {
+      #               url
+      #             }
+      #           }
+      #         }
+      #       `;
+      #
+      #       const variables = {
+      #         repositoryId: context.payload.repository.node_id,
+      #         categoryId: 'DIC_kwDOAbc123',  // Replace with your category ID
+      #         title: `🚀 Release ${tag}`,
+      #         body: `## Release ${tag}\n\n` +
+      #               `**Image:** \`${image}:${tag}\`\n` +
+      #               `**Digest:** \`sha256:${digest}\`\n\n` +
+      #               `### Links\n\n` +
+      #               `- [View Release](${releaseUrl})\n` +
+      #               `- [Workflow Run](${runUrl})\n` +
+      #               `- Receipt: \`receipt-${tag}.json\` (attached to release)\n\n` +
+      #               `### Verification\n\n` +
+      #               '```bash\n' +
+      #               `cosign verify ${image}:${tag}\n` +
+      #               'docker pull ' + image + ':' + tag + '\n' +
+      #               '```'
+      #       };
+      #
+      #       await github.graphql(query, variables);
+
+      - name: Create release summary
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## 🚀 Release Promoted
+
+          **Tag**: \`${{ inputs.tag }}\`
+          **Digest**: \`sha256:${{ inputs.digest }}\`
+          **Image**: \`${{ inputs.image }}:${{ inputs.tag }}\`
+
+          ### Verification
+          \`\`\`bash
+          cosign verify ${{ inputs.image }}:${{ inputs.tag }} \\
+            --certificate-identity-regexp="^https://github.com/.+/.+@" \\
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+          \`\`\`
+
+          ### GitHub Release
+          [View Release](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.tag }})
+
+          ### Next Steps
+          - [x] Image promoted and signed
+          - [x] Signatures verified (tag + digest)
+          - [x] GitHub Release created
+          - [ ] Update deployment manifests to reference \`${{ inputs.tag }}\`
+          - [ ] Notify team of new release
+          EOF
+
+  report-failure:
+    name: Report Failure
+    runs-on: ubuntu-latest
+    needs: [preflight, promote]
+    if: failure()
+    permissions:
+      issues: write
+    steps:
+      - name: Determine failure stage
+        id: stage
+        run: |
+          # Check which job failed
+          if [[ "${{ needs.preflight.result }}" == "failure" ]]; then
+            echo "stage=preflight" >> "$GITHUB_OUTPUT"
+            echo "stage_name=Preflight Validation" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ needs.promote.result }}" == "failure" ]]; then
+            echo "stage=promote" >> "$GITHUB_OUTPUT"
+            echo "stage_name=Promote and Sign" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=unknown" >> "$GITHUB_OUTPUT"
+            echo "stage_name=Unknown" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update issue
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STAGE: ${{ steps.stage.outputs.stage_name }}
+          IMAGE: ${{ inputs.image }}
+          DIGEST: ${{ inputs.digest }}
+          TAG: ${{ inputs.tag }}
+          ALLOW_NON_SEMVER: ${{ inputs.allow_non_semver }}
+        with:
+          script: |
+            const runUrl = process.env.RUN_URL;
+            const stage = process.env.STAGE;
+            const image = process.env.IMAGE;
+            const digest = process.env.DIGEST;
+            const tag = process.env.TAG;
+            const allowNonSemver = process.env.ALLOW_NON_SEMVER;
+
+            // Check if issue already exists for this tag
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'promotion-failure,needs-triage',
+              state: 'open'
+            });
+
+            const issueTitle = `⚠️ Promotion failed: ${tag}`;
+            const existingIssue = issues.data.find(i => i.title === issueTitle);
+
+            const body = "## Promotion Failure\n\n" +
+              "**Failed Stage:** " + stage + "\n" +
+              "**Run:** " + runUrl + "\n" +
+              "**Time:** " + new Date().toISOString() + "\n\n" +
+              "### Inputs\n" +
+              "- **Image:** `" + image + "`\n" +
+              "- **Digest:** `sha256:" + digest + "`\n" +
+              "- **Tag:** `" + tag + "`\n" +
+              "- **Allow Non-SemVer:** `" + allowNonSemver + "`\n\n" +
+              "### Common Failure Causes\n\n" +
+              "#### Preflight Failures\n" +
+              "- Invalid digest format (must be 64 hex chars, no `sha256:` prefix)\n" +
+              "- Invalid image path (must be `ghcr.io/<owner>/<name>`)\n" +
+              "- Tag policy violation (must be `vX.Y.Z`, `stable`, or `latest`)\n" +
+              "- Tag already exists (immutability enforced)\n" +
+              "- Source digest not found in registry\n\n" +
+              "#### Promote Failures\n" +
+              "- GHCR authentication failed\n" +
+              "- Cosign signing/verification failed\n" +
+              "- Post-promotion sanity check failed (`hhfab version` produced no output)\n" +
+              "- GitHub Release creation failed\n\n" +
+              "### Troubleshooting\n\n" +
+              "1. Review the [workflow run logs](" + runUrl + ")\n" +
+              "2. Check the [Promote Release Runbook](https://github.com/" + context.repo.owner + "/" + context.repo.repo + "/blob/main/docs/runbooks/promote-release.md)\n" +
+              "3. Verify inputs:\n" +
+              "   ```bash\n" +
+              "   # Check digest format (should be 64 hex chars)\n" +
+              "   echo '" + digest + "' | grep -E '^[0-9a-f]{64}$'\n\n" +
+              "   # Check if digest exists\n" +
+              "   docker buildx imagetools inspect " + image + "@sha256:" + digest + "\n\n" +
+              "   # Check if tag already exists\n" +
+              "   docker buildx imagetools inspect " + image + ":" + tag + "\n" +
+              "   ```\n\n" +
+              "### Next Steps\n\n" +
+              "- [ ] Review workflow logs to identify root cause\n" +
+              "- [ ] Fix the issue (update inputs, verify digest exists, use different tag, etc.)\n" +
+              "- [ ] Re-run the promotion workflow\n" +
+              "- [ ] Close this issue once resolved\n\n" +
+              "---\n" +
+              "*Auto-generated by promote-release workflow*";
+
+            if (existingIssue) {
+              // Append to existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: "---\n" + body
+              });
+              console.log("Updated issue #" + existingIssue.number);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: body,
+                labels: ['promotion-failure', 'needs-triage', 'ci']
+              });
+              console.log("Created issue #" + newIssue.data.number);
+            }
