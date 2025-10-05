@@ -206,13 +206,10 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          case "${HHFAB_IMAGE_DIGEST:-}" in
-            *@sha256:[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\
-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\
-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]\
-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-            *) echo "HHFAB_IMAGE_DIGEST must be digest-pinned (@sha256:…)" >&2; exit 3 ;;
-          esac
+          if [[ ! "${HHFAB_IMAGE_DIGEST:-}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+            echo "HHFAB_IMAGE_DIGEST must be digest-pinned (@sha256:...)" >&2
+            exit 3
+          fi
       - name: Install cosign
         if: ${{ env.COSIGN_VERIFY == '1' }}
         uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
