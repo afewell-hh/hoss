@@ -1,0 +1,76 @@
+apiVersion: demon.io/v1
+kind: UICard
+metadata:
+  id: hoss-validate-card
+  name: HOSS Validation
+  description: Fabric topology validation results from hhfab
+
+spec:
+  kind: result-envelope
+
+  match:
+    rituals:
+      - hoss-validate
+
+  display:
+    title: "HOSS Fabric Validation"
+    icon: "check-circle"
+    color:
+      ok: green
+      warning: yellow
+      error: red
+
+  fields:
+    - path: status
+      label: Status
+      type: badge
+      mapping:
+        ok: Success
+        warning: Warning
+        error: Failed
+
+    - path: counts.validated
+      label: Diagrams Validated
+      type: number
+
+    - path: counts.warnings
+      label: Warnings
+      type: number
+      highlight: true
+
+    - path: counts.failures
+      label: Failures
+      type: number
+      highlight: true
+
+    - path: tool.version
+      label: Tool Version
+      type: text
+
+    - path: tool.imageDigest
+      label: Image Digest
+      type: digest
+      truncate: 12
+
+    - path: timestamp
+      label: Validated At
+      type: timestamp
+
+  sections:
+    - title: Validation Details
+      fields:
+        - status
+        - counts.validated
+        - counts.warnings
+        - counts.failures
+
+    - title: Tool Information
+      fields:
+        - tool.version
+        - tool.imageDigest
+        - timestamp
+
+    - title: Validated Files
+      collapsible: true
+      field: matrix
+      type: list

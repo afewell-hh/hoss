@@ -1,0 +1,24 @@
+apiVersion: demon.io/v1
+kind: Ritual
+metadata:
+  name: hoss-validate
+  description: Validate Hedgehog fabric wiring diagram using hhfab
+
+spec:
+  input:
+    contract: hoss/validate.request
+    version: 0.1.0
+
+  output:
+    contract: hoss/validate.result
+    version: 0.1.0
+
+  steps:
+    - name: validate-with-hhfab
+      capsule: hhfab
+      with: {}
+      timeout: 300s
+
+  retry:
+    maxAttempts: 1
+    backoff: none
