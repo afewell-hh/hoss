@@ -1,0 +1,226 @@
+name: Tag Drift Watcher
+run-name: "tag-drift @ ${{ github.sha }}"
+
+on:
+  schedule:
+    - cron: '17 4 * * *'  # Daily at 4:17 AM UTC (offset from digest-drift-watcher)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  scan-tags:
+    name: Scan Promoted Tags for Drift
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+
+      - name: Log in to GHCR
+        uses: docker/login-action@74b85c2af8a9cd2e75dfce0289e694e935e48b64  # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download recent promotion receipts
+        id: download
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/receipts
+
+          # Download receipts from last 10 releases
+          echo "📥 Downloading promotion receipts from recent releases..."
+
+          RELEASES=$(gh release list --limit 10 --json tagName --jq '.[].tagName')
+
+          for tag in $RELEASES; do
+            echo "Checking release: $tag"
+            RECEIPT="receipt-${tag}.json"
+
+            if gh release view "$tag" --json assets --jq ".assets[].name" | grep -q "^${RECEIPT}$"; then
+              gh release download "$tag" --pattern "$RECEIPT" --dir .artifacts/receipts 2>/dev/null || true
+              echo "  ✅ Downloaded: $RECEIPT"
+            else
+              echo "  ⏭️  No receipt found for: $tag"
+            fi
+          done
+
+          # Count receipts
+          RECEIPT_COUNT=$(find .artifacts/receipts -name "receipt-*.json" 2>/dev/null | wc -l || echo "0")
+          echo "receipt_count=$RECEIPT_COUNT" >> "$GITHUB_OUTPUT"
+
+          if [ "$RECEIPT_COUNT" -eq 0 ]; then
+            echo "⚠️  No receipts found to check"
+          else
+            echo "✅ Found $RECEIPT_COUNT receipt(s) to validate"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Scan receipts and compare digests
+        id: scan
+        if: steps.download.outputs.receipt_count != '0'
+        run: |
+          set -euo pipefail
+
+          DRIFT_DETECTED=0
+          DRIFT_DETAILS=""
+
+          echo "🔍 Scanning promotion receipts for tag drift..."
+
+          for receipt in .artifacts/receipts/receipt-*.json; do
+            [ -f "$receipt" ] || continue
+
+            TAG_REF=$(jq -r '.outputs.tag_reference' "$receipt")
+            EXPECTED_DIGEST=$(jq -r '.outputs.resolved_manifest_digest' "$receipt")
+            TAG=$(jq -r '.inputs.tag' "$receipt")
+
+            echo ""
+            echo "Checking: $TAG_REF"
+            echo "  Expected digest: $EXPECTED_DIGEST"
+
+            # Get current digest for the tag
+            CURRENT_DIGEST=$(docker buildx imagetools inspect "$TAG_REF" --format '{{.Manifest.Digest}}' 2>/dev/null || echo "NOTFOUND")
+
+            if [ "$CURRENT_DIGEST" = "NOTFOUND" ]; then
+              echo "  ⚠️  Tag not found (may have been deleted)"
+              DRIFT_DETAILS="${DRIFT_DETAILS}\n- **${TAG}**: Tag not found in registry (deleted?)"
+              DRIFT_DETECTED=1
+            elif [ "$CURRENT_DIGEST" != "$EXPECTED_DIGEST" ]; then
+              echo "  ❌ DRIFT DETECTED!"
+              echo "    Current digest: $CURRENT_DIGEST"
+              echo "    Expected digest: $EXPECTED_DIGEST"
+              DRIFT_DETAILS="${DRIFT_DETAILS}\n- **${TAG}**: Tag re-pointed from \`${EXPECTED_DIGEST}\` to \`${CURRENT_DIGEST}\`"
+              DRIFT_DETECTED=1
+            else
+              echo "  ✅ No drift detected"
+            fi
+          done
+
+          echo "drift_detected=$DRIFT_DETECTED" >> "$GITHUB_OUTPUT"
+          echo "drift_details<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$DRIFT_DETAILS" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+          if [ $DRIFT_DETECTED -eq 1 ]; then
+            echo ""
+            echo "❌ Tag drift detected! See details above."
+            exit 0  # Don't fail the job, just report via issue
+          else
+            echo ""
+            echo "✅ No tag drift detected across all scanned receipts"
+          fi
+
+      - name: Upload drift artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.0
+        with:
+          name: tag-drift-scan-${{ github.run_id }}
+          path: .artifacts/receipts/*.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Create or update drift issue
+        if: steps.scan.outputs.drift_detected == '1'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DRIFT_DETAILS: ${{ steps.scan.outputs.drift_details }}
+        with:
+          script: |
+            const runUrl = process.env.RUN_URL;
+            const driftDetails = process.env.DRIFT_DETAILS;
+
+            const title = '⚠️ Tag drift detected (promotion invariants violated)';
+
+            // Check for existing open issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci,ci-drift,tag-drift'
+            });
+
+            const existing = issues.find(i => i.title === title);
+
+            const body = `## Tag Drift Detected\n\n` +
+              `**Run:** ${runUrl}\n` +
+              `**Time:** ${new Date().toISOString()}\n\n` +
+              `### Drift Details\n\n` +
+              driftDetails + '\n\n' +
+              `### What This Means\n\n` +
+              `One or more promoted tags have been re-pointed to different digests than recorded in their promotion receipts. ` +
+              `This violates tag immutability and may indicate:\n\n` +
+              `- Manual tag manipulation outside the promote-release workflow\n` +
+              `- Registry corruption or compromise\n` +
+              `- Accidental force-push to GHCR\n\n` +
+              `### Action Required\n\n` +
+              `1. Review the [drift scan logs](${runUrl})\n` +
+              `2. Download drift artifacts to compare receipts\n` +
+              `3. Investigate why tags were re-pointed:\n` +
+              `   - Check GHCR audit logs\n` +
+              `   - Review recent workflow runs\n` +
+              `   - Check for unauthorized access\n` +
+              `4. Common resolutions:\n` +
+              `   - If intentional: Document in this issue and update receipts\n` +
+              `   - If accidental: Re-promote from last-good digest\n` +
+              `   - If suspicious: Investigate security incident\n\n` +
+              `See the [Tag Drift Runbook](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/runbooks/promote-release.md#tag-drift) for detailed procedures.\n\n` +
+              `---\n` +
+              `*Auto-generated by tag-drift-watcher*`;
+
+            if (existing) {
+              // Append to existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `---\n${body}`
+              });
+              console.log(`Updated existing issue #${existing.number}`);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci', 'ci-drift', 'tag-drift', 'needs-triage', 'security']
+              });
+              console.log(`Created new issue #${newIssue.data.number}`);
+            }
+
+      - name: Create summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Tag Drift Scan Results
+
+          **Receipts scanned:** ${{ steps.download.outputs.receipt_count || '0' }}
+          **Drift detected:** ${{ steps.scan.outputs.drift_detected || '0' }}
+
+          EOF
+
+          if [ "${{ steps.scan.outputs.drift_detected }}" = "1" ]; then
+            cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ### Drift Details
+
+          ${{ steps.scan.outputs.drift_details }}
+
+          ---
+          ⚠️ **Action required:** Review the auto-created issue for triage steps.
+          EOF
+          else
+            cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ✅ **All scanned tags point to their recorded digests.**
+          EOF
+          fi

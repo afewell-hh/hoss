@@ -1,0 +1,168 @@
+name: digest-drift-watcher
+run-name: "digest-drift @ ${{ github.sha }}"
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # Daily at 4am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+        with:
+          cosign-release: 'v2.2.4'
+
+      - name: Login to GHCR (optional)
+        if: env.GHCR_TOKEN != ''
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Collect current digests
+        run: |
+          set -Eeuo pipefail
+          mkdir -p .artifacts
+          REQUIRE_PINS=1 COSIGN_VERIFY=1 ./scripts/collect-digests.sh \
+            --bundle-out .artifacts/current-bundle.yaml \
+            --json-out .artifacts/current-digests.json
+
+      - name: Extract pinned HHFAB digest from var
+        id: pinned
+        run: |
+          echo "digest=${HHFAB_IMAGE_DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Compare digests and detect drift
+        id: drift
+        run: |
+          set -Eeuo pipefail
+
+          # Extract current digests
+          current_runtime=$(jq -r '.images.runtime' .artifacts/current-digests.json)
+          current_operate_ui=$(jq -r '.images.operate_ui' .artifacts/current-digests.json)
+          current_engine=$(jq -r '.images.engine' .artifacts/current-digests.json)
+
+          # Compare with pinned HHFAB (if it exists and is for the same repo)
+          pinned_digest="${{ steps.pinned.outputs.digest }}"
+
+          drift_detected=false
+          drift_summary=""
+
+          # Note: This is a basic check. Enhance with actual comparison logic
+          # For now, we verify the collected digests are valid and signed
+
+          if [[ -z "$current_runtime" ]] || [[ -z "$current_operate_ui" ]] || [[ -z "$current_engine" ]]; then
+            drift_detected=true
+            drift_summary="Missing digests in collection"
+          fi
+
+          # Check if any digest has changed (would need previous state stored)
+          # For initial implementation, just verify they're all valid
+          for digest in "$current_runtime" "$current_operate_ui" "$current_engine"; do
+            if [[ ! "$digest" =~ @sha256:[0-9a-f]{64}$ ]]; then
+              drift_detected=true
+              drift_summary="${drift_summary}\n- Non-pinned digest: $digest"
+            fi
+          done
+
+          echo "drift_detected=$drift_detected" >> "$GITHUB_OUTPUT"
+          echo "drift_summary<<EOF" >> "$GITHUB_OUTPUT"
+          echo -e "$drift_summary" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Upload drift artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: digest-drift-${{ github.run_id }}
+          path: .artifacts/*.{json,yaml}
+          retention-days: 7
+
+      - name: Create issue on drift detection
+        if: steps.drift.outputs.drift_detected == 'true'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DRIFT_SUMMARY: ${{ steps.drift.outputs.drift_summary }}
+          COMMIT_SHA: ${{ github.sha }}
+        with:
+          script: |
+            const runUrl = process.env.RUN_URL;
+            const driftSummary = process.env.DRIFT_SUMMARY;
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-drift,digest-watcher',
+              state: 'open'
+            });
+
+            const body = "## Digest Drift Detected\n\n" +
+              "**Run:** " + runUrl + "\n" +
+              "**Commit:** `" + process.env.COMMIT_SHA + "`\n" +
+              "**Time:** " + new Date().toISOString() + "\n\n" +
+              "**Drift Details:**\n```\n" + driftSummary + "\n```\n\n" +
+              "### Action Required\n" +
+              "1. Review the [drift check logs](" + runUrl + ")\n" +
+              "2. Check artifacts for digest comparison\n" +
+              "3. Common causes:\n" +
+              "   - Upstream image updates\n" +
+              "   - Tag re-pointing (mutable tags)\n" +
+              "   - Registry drift\n\n" +
+              "See the [Review Kit Runbook](https://github.com/" + context.repo.owner + "/" + context.repo.repo + "/blob/main/docs/runbooks/review-kit.md) for triage procedures.\n\n" +
+              "---\n" +
+              "*Auto-generated by digest drift watcher*";
+
+            if (issues.data.length > 0) {
+              // Append to existing issue
+              const issue = issues.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: "---\n" + body
+              });
+              console.log("Updated issue #" + issue.number);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '⚠️ Digest drift detected',
+                body: body,
+                labels: ['ci-drift', 'digest-watcher', 'needs-triage']
+              });
+              console.log("Created issue #" + newIssue.data.number);
+            }
+
+      - name: Summary
+        if: always()
+        run: |
+          if [[ -f .artifacts/current-digests.json ]]; then
+            echo "## Drift Check Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Drift Detected:** ${{ steps.drift.outputs.drift_detected }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Current Digests" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+            cat .artifacts/current-digests.json >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,153 @@
+name: .github/workflows/digest-rotate.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger_review:
+        description: 'Trigger review-kit workflow after rotation'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: read
+  id-token: write     # for cosign keyless
+  packages: write     # push to GHCR
+  actions: write      # for workflow_dispatch triggers
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da  # v3.7.0
+        with:
+          cosign-release: 'v2.2.4'
+
+      - name: Login to GHCR (optional)
+        if: env.GHCR_TOKEN != ''
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push hhfab tool image
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hhfab
+          IMAGE_TAG: v0.1.0
+        run: |
+          set -Eeuo pipefail
+          docker build -f Dockerfile.tools.hhfab -t "${IMAGE_NAME}:${IMAGE_TAG}" .
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: Get image digest
+        id: digest
+        env:
+          IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/hhfab:v0.1.0
+        run: |
+          set -Eeuo pipefail
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE_NAME}" | awk '/Digest: sha256:/ {print $2; exit}')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "full_ref=ghcr.io/${{ github.repository_owner }}/hhfab@${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign image with cosign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          set -Eeuo pipefail
+          cosign sign --yes "${{ steps.digest.outputs.full_ref }}"
+
+      - name: Collect digests for Demon images
+        run: |
+          set -Eeuo pipefail
+          mkdir -p .artifacts
+          ./scripts/collect-digests.sh \
+            --bundle-out .artifacts/demon-bundle.yaml \
+            --json-out .artifacts/demon-digests.json
+
+      - name: Validate JSON shape
+        run: |
+          set -Eeuo pipefail
+          j=".artifacts/demon-digests.json"
+          jq -e '
+            .status?      | not and
+            .tag          | type=="string" and
+            .images       | type=="object" and
+            .images.runtime?     | type=="string" and
+            .images.operate_ui?  | type=="string" and
+            .images.engine?      | type=="string"
+          ' "$j" >/dev/null
+          echo "✅ JSON structure validated"
+
+      - name: Enforce required image set
+        run: |
+          set -Eeuo pipefail
+          j=.artifacts/demon-digests.json
+          req='["engine","operate_ui","runtime"]'
+          got=$(jq -r '.images|keys|sort|@json' "$j")
+          test "$got" = "$req" || { echo "::error::image key set drift: $got != $req"; exit 2; }
+          echo "✅ Image key set matches required set"
+
+      - name: Enforce digest pins & verify signatures
+        if: always()
+        run: |
+          set -Eeuo pipefail
+          j=".artifacts/demon-digests.json"
+          test -s "$j"
+
+          # every image must be digest-pinned
+          bad=$(jq -r '
+            .images
+            | to_entries
+            | map(select(.value|test("@sha256:[0-9a-f]{64}$")|not))
+            | length' "$j")
+          if [ "$bad" -ne 0 ]; then
+            echo "::error::one or more images are not digest-pinned"; exit 2
+          fi
+          echo "✅ All images are digest-pinned"
+
+          if [ "${COSIGN_VERIFY:-0}" = "1" ]; then
+            command -v cosign >/dev/null || { echo "missing cosign"; exit 127; }
+            for ref in $(jq -r '.images|to_entries[].value' "$j"); do
+              cosign verify \
+                --certificate-identity-regexp '^https://github\.com/afewell-hh/Demon/\.github/workflows/.*@refs/heads/main' \
+                --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+                "$ref" >/dev/null
+            done
+            echo "✅ All signatures verified"
+          fi
+
+      - name: Upload Demon digest artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: demon-digests-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .artifacts/demon-bundle.yaml
+            .artifacts/demon-digests.json
+          retention-days: 7
+
+      - name: Update HHFAB_IMAGE_DIGEST repository variable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          gh api -X PATCH "repos/${{ github.repository }}/actions/variables/HHFAB_IMAGE_DIGEST" \
+            -f value="${{ steps.digest.outputs.full_ref }}"
+          echo "✅ Updated HHFAB_IMAGE_DIGEST to: ${{ steps.digest.outputs.full_ref }}"
+
+      - name: Trigger review-kit workflow
+        if: inputs.trigger_review == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -Eeuo pipefail
+          gh workflow run review-kit.yml --ref main
+          echo "✅ Triggered review-kit workflow on main branch"
