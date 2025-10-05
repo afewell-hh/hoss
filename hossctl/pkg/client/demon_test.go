@@ -253,3 +253,79 @@ func TestAuthentication(t *testing.T) {
 		t.Fatalf("StartRitual with auth failed: %v", err)
 	}
 }
+
+func TestStartRitual_NonOKStatus(t *testing.T) {
+	// Mock server that returns 400
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Invalid request"))
+	}))
+	defer server.Close()
+
+	client := NewDemonClient(server.URL, "")
+
+	input := map[string]interface{}{
+		"diagramPath": "test.yaml",
+	}
+
+	_, err := client.StartRitual("hoss-validate", input)
+	if err == nil {
+		t.Fatal("Expected error for non-OK status, got nil")
+	}
+
+	if err.Error() != "API error (status 400): Invalid request" {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestStartRitual_InvalidJSON(t *testing.T) {
+	// Mock server that returns invalid JSON
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte("invalid json"))
+	}))
+	defer server.Close()
+
+	client := NewDemonClient(server.URL, "")
+
+	input := map[string]interface{}{
+		"diagramPath": "test.yaml",
+	}
+
+	_, err := client.StartRitual("hoss-validate", input)
+	if err == nil {
+		t.Fatal("Expected error for invalid JSON, got nil")
+	}
+}
+
+func TestGetRunStatus_Error(t *testing.T) {
+	// Mock server that returns 500
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Internal error"))
+	}))
+	defer server.Close()
+
+	client := NewDemonClient(server.URL, "")
+
+	_, err := client.GetRunStatus("run-test-123")
+	if err == nil {
+		t.Fatal("Expected error for 500 status, got nil")
+	}
+}
+
+func TestGetEnvelope_Error(t *testing.T) {
+	// Mock server that returns 404
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Not found"))
+	}))
+	defer server.Close()
+
+	client := NewDemonClient(server.URL, "")
+
+	_, err := client.GetEnvelope("run-nonexistent")
+	if err == nil {
+		t.Fatal("Expected error for 404 status, got nil")
+	}
+}
