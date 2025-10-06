@@ -19,6 +19,7 @@ on:
 permissions:
   contents: read
   packages: read
+  security-events: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -171,6 +172,7 @@ jobs:
           path: ${{ steps.run.outputs.summary_path }}
           if-no-files-found: warn
           retention-days: 1
+          overwrite: true
   review_kit_strict:
     name: review-kit (strict)
     needs: smoke-local
@@ -179,6 +181,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      security-events: write
     steps:
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
@@ -408,10 +411,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
-          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          name: review-kit-summary-strict.json
           path: ${{ steps.summary.outputs.path }}
           if-no-files-found: warn
           retention-days: 1
+          overwrite: true
 
       - name: Create issue on nightly failure
         if: failure() && (github.event_name == 'schedule' || inputs.force_fail == true)
