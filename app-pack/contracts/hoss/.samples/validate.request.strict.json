@@ -1,0 +1,5 @@
+{
+  "diagramPath": "samples/topology-min.yaml",
+  "strict": true,
+  "fabConfigPath": "hhfab-env/fab.yaml"
+}

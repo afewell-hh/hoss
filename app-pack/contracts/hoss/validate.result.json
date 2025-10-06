@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://demon.io/contracts/hoss/validate.result.v0.1.0.json",
+  "title": "HOSS Validate Result",
+  "description": "Result envelope for HOSS fabric topology validation",
+  "type": "object",
+  "required": ["status", "counts", "tool"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ok", "warning", "error"],
+      "description": "Overall validation status"
+    },
+    "counts": {
+      "type": "object",
+      "required": ["validated", "warnings", "failures"],
+      "properties": {
+        "validated": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of diagrams validated"
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of validation warnings"
+        },
+        "failures": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of validation failures"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version", "imageDigest"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Validation tool name"
+        },
+        "version": {
+          "type": "string",
+          "description": "Validation tool version"
+        },
+        "imageDigest": {
+          "type": "string",
+          "pattern": "^ghcr\\.io/.+@sha256:[0-9a-f]{64}$",
+          "description": "Digest-pinned container image reference"
+        }
+      },
+      "additionalProperties": false
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of validation execution"
+    },
+    "matrix": {
+      "type": "array",
+      "description": "List of validated diagram paths",
+      "items": {
+        "type": "string"
+      }
+    },
+    "errors": {
+      "type": "array",
+      "description": "Detailed error messages if validation failed",
+      "items": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

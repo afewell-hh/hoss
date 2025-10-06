@@ -1,0 +1,22 @@
+{
+  "status": "error",
+  "counts": {
+    "validated": 0,
+    "warnings": 0,
+    "failures": 1
+  },
+  "tool": {
+    "name": "hhfab",
+    "version": "v0.41.3",
+    "imageDigest": "ghcr.io/afewell-hh/hoss/hhfab@sha256:54814bbf4e8459cfb35c7cf8872546f0d5d54da9fc317ffb53eab0e137b21d7b"
+  },
+  "timestamp": "2025-10-05T12:34:56Z",
+  "matrix": ["samples/invalid/bad-breakout.yaml"],
+  "errors": [
+    {
+      "message": "Invalid breakout configuration: port 49/1 not found",
+      "file": "samples/invalid/bad-breakout.yaml",
+      "line": 45
+    }
+  ]
+}

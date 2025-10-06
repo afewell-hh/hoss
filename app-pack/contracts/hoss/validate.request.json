@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://demon.io/contracts/hoss/validate.request.v0.1.0.json",
+  "title": "HOSS Validate Request",
+  "description": "Request contract for HOSS fabric topology validation",
+  "type": "object",
+  "required": ["diagramPath"],
+  "properties": {
+    "diagramPath": {
+      "type": "string",
+      "description": "Path to the wiring diagram YAML file to validate",
+      "pattern": "^.+\\.ya?ml$"
+    },
+    "strict": {
+      "type": "boolean",
+      "description": "Enable strict validation mode (zero warnings allowed)",
+      "default": false
+    },
+    "fabConfigPath": {
+      "type": "string",
+      "description": "Optional path to fab.yaml configuration file",
+      "pattern": "^.+\\.ya?ml$"
+    }
+  },
+  "additionalProperties": false
+}
