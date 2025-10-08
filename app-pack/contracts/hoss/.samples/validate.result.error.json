@@ -1,5 +1,14 @@
 {
   "status": "error",
+  "metrics": {
+    "durationMs": 567,
+    "exitCode": 1,
+    "counts": {
+      "validated": 0,
+      "warnings": 0,
+      "failures": 1
+    }
+  },
   "counts": {
     "validated": 0,
     "warnings": 0,

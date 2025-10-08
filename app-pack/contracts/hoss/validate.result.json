@@ -4,12 +4,40 @@
   "title": "HOSS Validate Result",
   "description": "Result envelope for HOSS fabric topology validation",
   "type": "object",
-  "required": ["status", "counts", "tool"],
+  "required": ["status", "counts", "tool", "metrics"],
   "properties": {
     "status": {
       "type": "string",
       "enum": ["ok", "warning", "error"],
       "description": "Overall validation status"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Execution metrics and mirrored counts",
+      "required": ["durationMs", "exitCode", "counts"],
+      "properties": {
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total execution duration in milliseconds"
+        },
+        "exitCode": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Process exit code from validation runtime"
+        },
+        "counts": {
+          "type": "object",
+          "required": ["validated", "warnings", "failures"],
+          "properties": {
+            "validated": { "type": "integer", "minimum": 0 },
+            "warnings":  { "type": "integer", "minimum": 0 },
+            "failures":  { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     },
     "counts": {
       "type": "object",

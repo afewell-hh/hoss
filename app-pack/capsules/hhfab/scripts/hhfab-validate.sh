@@ -20,8 +20,9 @@ HHFAB_VERSION="$(hhfab --version 2>/dev/null || echo "unknown")"
 HHFAB_NAME="hhfab"
 HHFAB_IMAGE_DIGEST="${HHFAB_IMAGE_DIGEST:-unknown}"
 
-# Timestamp in ISO 8601 format
+# Timestamp in ISO 8601 format and start timing
 TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+START_MS=$(date +%s%3N)
 
 # Run hhfab validation
 set +e
@@ -83,10 +84,23 @@ if [ "$RC" -ne 0 ] && [ -f "${HHFAB_LOG}" ]; then
 	errors_json="[{\"message\":\"hhfab validation failed: ${error_msg}\"}]"
 fi
 
+# Calculate duration
+END_MS=$(date +%s%3N)
+DURATION_MS=$((END_MS - START_MS))
+
 # Write Explainable Result Envelope conforming to validate.result.json schema
 cat > "${ENVELOPE_PATH}" <<EOF
 {
   "status": "${status}",
+  "metrics": {
+    "durationMs": ${DURATION_MS},
+    "exitCode": ${RC},
+    "counts": {
+      "validated": ${validated},
+      "warnings": ${warnings},
+      "failures": ${failures}
+    }
+  },
   "counts": {
     "validated": ${validated},
     "warnings": ${warnings},
