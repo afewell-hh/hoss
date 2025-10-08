@@ -193,6 +193,8 @@ HHFAB_MATRIX="$(cat .github/review-kit/matrix.txt)" bash scripts/hhfab-validate.
 - Must pass hhfab validation (if `fab.yaml` present)
 - Must not be in `samples/invalid/` (those are for negative tests)
 
+Note: Comment lines starting with `#` and blank lines are ignored when computing the HHFAB_MATRIX count and matrix list.
+
 **Removing invalid targets:**
 If a sample becomes invalid, either fix it or remove it from the matrix. The strict job will fail if any target is invalid.
 
