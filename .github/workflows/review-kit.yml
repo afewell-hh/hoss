@@ -19,11 +19,13 @@ on:
 permissions:
   contents: read
   packages: read
+  security-events: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 env:
   HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+  COSIGN_VERIFY: ${{ vars.COSIGN_VERIFY || '0' }}
   MATRIX_FILE: .github/review-kit/matrix.txt
   ARTIFACT_DIR: .artifacts/review-kit
 
@@ -164,12 +166,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload summary artifact
         if: always() && steps.run.outputs.summary_path != ''
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
-          name: review-kit-summary.json
+          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.run.outputs.summary_path }}
           if-no-files-found: warn
           retention-days: 1
+          overwrite: true
   review_kit_strict:
     name: review-kit (strict)
     needs: smoke-local
@@ -178,6 +181,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      security-events: write
     steps:
       - name: Login to GHCR
         run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
@@ -201,6 +205,29 @@ jobs:
           else
             echo "HHFAB_IMAGE_DIGEST is MISSING"; exit 2
           fi
+      - name: Guard HHFAB_IMAGE_DIGEST is digest-pinned
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ ! "${HHFAB_IMAGE_DIGEST:-}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+            echo "HHFAB_IMAGE_DIGEST must be digest-pinned (@sha256:...)" >&2
+            exit 3
+          fi
+      - name: Install cosign
+        if: ${{ env.COSIGN_VERIFY == '1' }}
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62
+        with:
+          cosign-release: 'v2.2.4'
+      - name: Verify HHFAB image signature
+        if: ${{ env.COSIGN_VERIFY == '1' }}
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          set -Eeuo pipefail
+          cosign verify \
+            --certificate-oidc-issuer-regexp 'https://token.actions.githubusercontent.com' \
+            --certificate-identity-regexp 'https://github.com/afewell-hh/hoss/.*' \
+            "${HHFAB_IMAGE_DIGEST}"
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
       - name: Force-fail summary (dispatch only)
@@ -382,12 +409,13 @@ jobs:
           category: hhfab
       - name: Upload summary artifact
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
-          name: review-kit-summary.json
+          name: review-kit-summary-strict.json
           path: ${{ steps.summary.outputs.path }}
           if-no-files-found: warn
           retention-days: 1
+          overwrite: true
 
       - name: Create issue on nightly failure
         if: failure() && (github.event_name == 'schedule' || inputs.force_fail == true)

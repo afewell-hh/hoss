@@ -39,8 +39,8 @@ docker run --rm \
   "$HHFAB_IMAGE_DIGEST" \
   'scripts/hhfab-validate.sh'
 
-# Check results
-cat .artifacts/review-kit/summary.json | jq .
+# Check results (smoke mode writes to summary-smoke-<id>.json)
+cat .artifacts/review-kit/summary-smoke-latest.json | jq .
 ```
 
 ### How to Rotate the hhfab Digest
@@ -65,7 +65,7 @@ gh workflow run review-kit.yml --ref main
 ## Workflow Details
 
 ### smoke-local
-Best-effort validation using any available hhfab binary on the runner. Allowed to fail without blocking CI. Emits `.artifacts/review-kit/summary.json` for diagnostics.
+Best-effort validation using any available hhfab binary on the runner. Allowed to fail without blocking CI. Emits `.artifacts/review-kit/summary-smoke-<run>.json` (and updates `summary-smoke-latest.json`) for diagnostics.
 
 ### review-kit (strict)
 Digest-pinned, network-isolated, read-only container validation with comprehensive enforcement gates:

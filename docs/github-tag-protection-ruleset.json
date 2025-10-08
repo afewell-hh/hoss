@@ -1,0 +1,41 @@
+{
+  "name": "Protect SemVer Release Tags",
+  "target": "tag",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/tags/v[0-9]*.[0-9]*.[0-9]*"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "deletion",
+      "parameters": {}
+    },
+    {
+      "type": "required_linear_history",
+      "parameters": {}
+    },
+    {
+      "type": "creation",
+      "parameters": {
+        "restricted_create_for_users_teams_apps": true,
+        "allow_creation_by_users": [],
+        "allow_creation_by_teams": [],
+        "allow_creation_by_apps": [
+          "github-actions"
+        ]
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ]
+}
