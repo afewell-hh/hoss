@@ -35,8 +35,8 @@ set -e
 # to derive the validated targets count when available.
 validated=0
 if [[ -n "${HHFAB_MATRIX:-}" ]]; then
-	# count non-empty lines
-	validated=$(printf '%s' "${HHFAB_MATRIX}" | awk 'NF' | wc -l | tr -d ' ')
+	# Count non-empty, non-comment lines
+	validated=$(printf '%s\n' "${HHFAB_MATRIX}" | awk '!/^\s*#/ && NF' | wc -l | tr -d ' ')
 	if [[ -z "${validated// /}" ]]; then validated=0; fi
 else
 	# fall back: if hhfab succeeded, assume 1 validated target
@@ -45,16 +45,18 @@ fi
 
 matrix_json="[]"
 if [[ -n "${HHFAB_MATRIX:-}" ]]; then
-	# build a JSON array without requiring jq
+	# build a JSON array without requiring jq; skip comments/blank lines
 	IFS=$'\n' read -r -d '' -a _m <<< "${HHFAB_MATRIX}" || true
 	vals=""
 	for e in "${_m[@]}"; do
-		if [[ -n "${e// /}" ]]; then
-			# escape backslashes and double quotes minimally
-			esc=${e//\\/\\\\}
-			esc=${esc//"/\\"}
-			vals+="\"${esc}\"," 
+		# skip comment or blank
+		if [[ -z "${e// /}" ]] || [[ "$e" =~ ^[[:space:]]*# ]]; then
+			continue
 		fi
+		# escape backslashes and double quotes minimally
+		esc=${e//\\/\\\\}
+		esc=${esc//"/\\"}
+		vals+="\"${esc}\"," 
 	done
 	vals=${vals%,}
 	matrix_json="[${vals}]"
