@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Optional verbose tracing when DEMON_DEBUG is enabled
+if [[ -n "${DEMON_DEBUG:-}" && "${DEMON_DEBUG}" != "0" ]]; then
+  set -x
+fi
+
 # HOSS App Pack validation script - produces Explainable Result Envelope
 # This script runs inside the digest-pinned hhfab container and emits
 # a result envelope conforming to contracts/hoss/validate.result.json

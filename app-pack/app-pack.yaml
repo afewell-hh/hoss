@@ -26,10 +26,14 @@ capsules:
   - type: container-exec
     name: hhfab
     imageDigest: ghcr.io/afewell-hh/hoss/hhfab@sha256:54814bbf4e8459cfb35c7cf8872546f0d5d54da9fc317ffb53eab0e137b21d7b
-    command: ["bash", "-lc", "capsules/hhfab/scripts/hhfab-validate.sh"]
+    command: ["/bin/bash", "-c", "set -Eeuo pipefail; /workspace/capsules/hhfab/scripts/hhfab-validate.sh"]
     env:
       TMPDIR: /tmp
       HHFAB_CACHE_DIR: /tmp/.hhfab-cache
+      HOME: /tmp
+      HISTFILE: /dev/null
+      BASH_ENV: ""
+      SHELL: /bin/bash
     outputs:
       envelopePath: /workspace/.artifacts/summary.json
     sandbox:
