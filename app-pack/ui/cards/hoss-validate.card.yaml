@@ -21,7 +21,7 @@ spec:
       error: red
 
   fields:
-    - path: status
+    - path: result.data.status
       label: Status
       type: badge
       mapping:
@@ -29,48 +29,48 @@ spec:
         warning: Warning
         error: Failed
 
-    - path: counts.validated
+    - path: result.data.counts.validated
       label: Diagrams Validated
       type: number
 
-    - path: counts.warnings
+    - path: result.data.counts.warnings
       label: Warnings
       type: number
       highlight: true
 
-    - path: counts.failures
+    - path: result.data.counts.failures
       label: Failures
       type: number
       highlight: true
 
-    - path: tool.version
+    - path: result.data.tool.version
       label: Tool Version
       type: text
 
-    - path: tool.imageDigest
+    - path: result.data.tool.imageDigest
       label: Image Digest
       type: digest
       truncate: 12
 
-    - path: timestamp
+    - path: result.data.timestamp
       label: Validated At
       type: timestamp
 
   sections:
     - title: Validation Details
       fields:
-        - status
-        - counts.validated
-        - counts.warnings
-        - counts.failures
+        - result.data.status
+        - result.data.counts.validated
+        - result.data.counts.warnings
+        - result.data.counts.failures
 
     - title: Tool Information
       fields:
-        - tool.version
-        - tool.imageDigest
-        - timestamp
+        - result.data.tool.version
+        - result.data.tool.imageDigest
+        - result.data.timestamp
 
     - title: Validated Files
       collapsible: true
-      field: matrix
+      field: result.data.matrix
       type: list
