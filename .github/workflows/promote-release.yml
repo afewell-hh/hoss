@@ -118,7 +118,7 @@ jobs:
           echo "✅ Source digest verified"
 
       - name: Assert main validation is green
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
         with:
           script: |
             // Ensure main branch CI is passing before promoting
@@ -443,7 +443,7 @@ jobs:
 
       - name: Auto-close resolved promotion failures
         if: success()
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
         env:
           TAG: ${{ inputs.tag }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -522,7 +522,7 @@ jobs:
       # Alternative: GitHub Discussions
       # - name: Post to GitHub Discussions
       #   if: success()
-      #   uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+      #   uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
       #   with:
       #     script: |
       #       const tag = '${{ inputs.tag }}';
@@ -618,7 +618,7 @@ jobs:
           fi
 
       - name: Create or update issue
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd  # v8.0.0
         env:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           STAGE: ${{ steps.stage.outputs.stage_name }}
