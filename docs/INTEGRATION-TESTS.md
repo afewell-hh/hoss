@@ -8,6 +8,38 @@
 
 This document defines integration test scenarios for validating HOSS App Pack v0.1 against the Demon platform's App Pack infrastructure.
 
+## Quick Start
+
+For a minimal validation test:
+
+```bash
+# 1. Install app pack
+DEMON_APP_HOME=/tmp/app-home demonctl app install ./app-pack
+
+# 2. Create a simple matrix file (optional)
+cat > /tmp/matrix.txt <<EOF
+samples/topology-min.yaml
+EOF
+
+# 3. Run validation with hossctl
+export HHFAB_MATRIX=$(cat /tmp/matrix.txt)
+DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
+  hossctl validate samples/topology-min.yaml
+
+# Expected output:
+# {
+#   "result": {
+#     "success": true,
+#     "data": {
+#       "status": "ok",
+#       "counts": {"validated": 1, "warnings": 0, "failures": 0}
+#     }
+#   }
+# }
+```
+
+For debug diagnostics, prefix with `DEMON_DEBUG=1` to see container execution details.
+
 ## Prerequisites
 
 **Demon Platform Requirements:**
