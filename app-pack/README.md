@@ -13,7 +13,7 @@ HOSS App Pack is a signed, portable bundle that installs on any Demon instance v
 
 ## Sprint Wave A Progress
 
-**Deliverables:** 10/12 Complete (83%)
+**Deliverables:** 11/12 Complete (92%)
 - ✅ App Pack structure
 - ✅ JSON Schema contracts
 - ✅ Capsule integration
@@ -24,7 +24,7 @@ HOSS App Pack is a signed, portable bundle that installs on any Demon instance v
 - ✅ Documentation
 - ✅ Validation & testing
 - ✅ Security review
-- ⏳ Integration testing (Day 7)
+- ✅ Integration testing (Day 7) - [Success Report](https://github.com/afewell-hh/hoss/issues/31#issuecomment-3383584626)
 - ⏳ E2E validation (Days 8-10)
 
 **Documentation:**
@@ -37,6 +37,9 @@ HOSS App Pack is a signed, portable bundle that installs on any Demon instance v
 - **Ritual:** `hoss-validate` - Validate Hedgehog fabric wiring diagrams
 - **Contracts:** JSON Schema definitions for validation requests and results
 - **Capsule:** Digest-pinned hhfab container (SHA256-verified)
+  - Uses non-login shell (`/bin/bash -c`) for read-only filesystem compatibility
+  - Sets `HOME=/tmp` and `HISTFILE=/dev/null` to avoid write failures
+  - Supports `DEMON_DEBUG=1` for verbose container execution tracing
 - **UI Card:** Data-driven Operate card for validation results
 - **CLI:** `hossctl` for interacting with HOSS rituals via Demon APIs
 
