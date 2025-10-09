@@ -11,8 +11,7 @@ review-kit-strict:
 	docker run --rm --network=none --read-only --user 65532:65532 \
 	  --mount type=bind,source="$$PWD/.artifacts",target=/w/.artifacts \
 	  -v "$$PWD:/w:ro" -w /w \
-	  -e STRICT=true \
-	  -e HHFAB_MATRIX="$$$$(cat .github/review-kit/matrix.txt)" \
+	  -e STRICT=1 -e MATRIX="$$${MATRIX:-}" \
 	  -e HHFAB_IMAGE="$$HHFAB_IMAGE_DIGEST" -e HHFAB_IMAGE_DIGEST="$$HHFAB_IMAGE_DIGEST" \
 	  "$$HHFAB_IMAGE_DIGEST" \
 	  bash -lc 'set -Eeuo pipefail; hhfab version; bash scripts/hhfab-validate.sh'
@@ -70,7 +69,10 @@ hossctl-cross:
 app-pack: app-pack-build
 
 app-pack-build:
-	@./scripts/app-pack-build.sh
+	@echo "Building HOSS App Pack..."
+	@mkdir -p .artifacts
+	@tar -czf .artifacts/hoss-app-pack-v0.1.0.tar.gz app-pack/
+	@echo "✅ Built: .artifacts/hoss-app-pack-v0.1.0.tar.gz"
 
 app-pack-sign:
 	@echo "Signing HOSS App Pack with cosign..."

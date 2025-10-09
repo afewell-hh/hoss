@@ -8,7 +8,8 @@ metadata:
   license: Apache-2.0
 
 signing:
-  cosign: true
+  cosign:
+    enabled: false
 
 compatibility:
   appPackSchema: ">=1.0,<2.0"

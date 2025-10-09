@@ -28,7 +28,6 @@ env:
   COSIGN_VERIFY: ${{ vars.COSIGN_VERIFY || '0' }}
   MATRIX_FILE: .github/review-kit/matrix.txt
   ARTIFACT_DIR: .artifacts/review-kit
-  HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
 
 jobs:
   smoke-local:
@@ -38,6 +37,8 @@ jobs:
       matrix: ${{ steps.read-matrix.outputs.matrix }}
       strict-needed: ${{ steps['strict-needed'].outputs.strict_needed }}
       strict-files: ${{ steps['strict-changes'].outputs.strict_files }}
+    env:
+      HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
     steps:
       - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
       - name: Diagnose checkout & composite
