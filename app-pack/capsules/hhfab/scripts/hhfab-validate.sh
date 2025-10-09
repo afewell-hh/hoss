@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Optional verbose tracing when DEMON_DEBUG is enabled
+if [[ -n "${DEMON_DEBUG:-}" && "${DEMON_DEBUG}" != "0" ]]; then
+  set -x
+fi
+
 # HOSS App Pack validation script - produces Explainable Result Envelope
 # This script runs inside the digest-pinned hhfab container and emits
 # a result envelope conforming to contracts/hoss/validate.result.json
@@ -88,32 +93,37 @@ fi
 END_MS=$(date +%s%3N)
 DURATION_MS=$((END_MS - START_MS))
 
-# Write Explainable Result Envelope conforming to validate.result.json schema
+# Write Explainable Result Envelope conforming to Demon ResultEnvelope format
 cat > "${ENVELOPE_PATH}" <<EOF
 {
-  "status": "${status}",
-  "metrics": {
-    "durationMs": ${DURATION_MS},
-    "exitCode": ${RC},
-    "counts": {
-      "validated": ${validated},
-      "warnings": ${warnings},
-      "failures": ${failures}
+  "result": {
+    "success": $([ "$RC" -eq 0 ] && echo "true" || echo "false"),
+    "data": {
+      "status": "${status}",
+      "metrics": {
+        "durationMs": ${DURATION_MS},
+        "exitCode": ${RC},
+        "counts": {
+          "validated": ${validated},
+          "warnings": ${warnings},
+          "failures": ${failures}
+        }
+      },
+      "counts": {
+        "validated": ${validated},
+        "warnings": ${warnings},
+        "failures": ${failures}
+      },
+      "tool": {
+        "name": "${HHFAB_NAME}",
+        "version": "${HHFAB_VERSION}",
+        "imageDigest": "${HHFAB_IMAGE_DIGEST}"
+      },
+      "timestamp": "${TIMESTAMP}",
+      "matrix": ${matrix_json},
+      "errors": ${errors_json}
     }
-  },
-  "counts": {
-    "validated": ${validated},
-    "warnings": ${warnings},
-    "failures": ${failures}
-  },
-  "tool": {
-    "name": "${HHFAB_NAME}",
-    "version": "${HHFAB_VERSION}",
-    "imageDigest": "${HHFAB_IMAGE_DIGEST}"
-  },
-  "timestamp": "${TIMESTAMP}",
-  "matrix": ${matrix_json},
-  "errors": ${errors_json}
+  }
 }
 EOF
 

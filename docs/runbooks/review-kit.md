@@ -51,7 +51,12 @@ gh run list --workflow review-kit.yml --limit 5
 gh run view <RUN_ID> --log | grep '{"status"' | head -1
 
 # Or download the artifact (if upload succeeded)
-gh run download <RUN_ID> --name review-kit-summary.json
+#   smoke-local artifact: review-kit-summary-<RUN_ID>-<ATTEMPT>.json
+RUN_ID=<RUN_ID>
+RUN_ATTEMPT=<ATTEMPT>
+gh run download "$RUN_ID" --name "review-kit-summary-${RUN_ID}-${RUN_ATTEMPT}"
+#   strict artifact: review-kit-summary-strict.json
+gh run download <RUN_ID> --name review-kit-summary-strict.json
 ```
 
 ### 2. Common Failure Causes
@@ -103,7 +108,9 @@ docker run --rm \
   'set -Eeuo pipefail; scripts/hhfab-validate.sh'
 
 # Check the summary
-cat .artifacts/review-kit/summary.json | jq .
+cat .artifacts/review-kit/summary-smoke-latest.json | jq .
+
+# Strict runs write: summary-strict-<RUN>.json (latest pointer: summary-strict-latest.json)
 ```
 
 ## Minimum hhfab Version Policy
@@ -178,13 +185,15 @@ Future enhancement: nightly failures will auto-create GitHub issues with summary
 echo "samples/new-topology.yaml" >> .github/review-kit/matrix.txt
 
 # Validate locally before committing
-MATRIX="$(cat .github/review-kit/matrix.txt)" bash scripts/hhfab-validate.sh
+HHFAB_MATRIX="$(cat .github/review-kit/matrix.txt)" bash scripts/hhfab-validate.sh
 ```
 
 **Target requirements:**
 - Must be valid YAML/JSON files
 - Must pass hhfab validation (if `fab.yaml` present)
 - Must not be in `samples/invalid/` (those are for negative tests)
+
+Note: Comment lines starting with `#` and blank lines are ignored when computing the HHFAB_MATRIX count and matrix list.
 
 **Removing invalid targets:**
 If a sample becomes invalid, either fix it or remove it from the matrix. The strict job will fail if any target is invalid.

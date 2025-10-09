@@ -411,7 +411,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
         with:
-          name: review-kit-summary-strict.json
+          name: review-kit-summary-strict-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ steps.summary.outputs.path }}
           if-no-files-found: warn
           retention-days: 1
