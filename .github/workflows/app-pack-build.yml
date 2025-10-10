@@ -133,8 +133,8 @@ jobs:
         with:
           name: hoss-app-pack
           path: |
-            .artifacts/hoss-app-pack-v*.tar.gz
-            .artifacts/hoss-app-pack-v*.tar.gz.bundle
+            .artifacts/hoss-app-pack-v${{ env.APP_PACK_VERSION }}.tar.gz
+            .artifacts/hoss-app-pack-v${{ env.APP_PACK_VERSION }}.tar.gz.bundle
           retention-days: 90
 
   integration-test:
