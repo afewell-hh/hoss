@@ -4,6 +4,38 @@
 [![review-kit (strict)](https://github.com/afewell-hh/hoss/actions/workflows/review-kit.yml/badge.svg?job=review-kit%20%28strict%29)](https://github.com/afewell-hh/hoss/actions/workflows/review-kit.yml)
 [![actionlint](https://github.com/afewell-hh/hoss/actions/workflows/actionlint.yml/badge.svg)](https://github.com/afewell-hh/hoss/actions/workflows/actionlint.yml)
 
+**Hedgehog Operational Support System** - Fabric topology validation for Hedgehog Open Network Fabric.
+
+## Installation
+
+### Install from Release (Recommended)
+
+Download and install the latest release:
+
+```bash
+# Download RC1
+wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0-rc1/hoss-app-pack-v0.1.0.tar.gz
+tar -xzf hoss-app-pack-v0.1.0.tar.gz
+
+# Install with Demon
+DEMON_APP_HOME=/tmp/app-home demonctl app install ./app-pack
+
+# Run validation
+DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
+  demonctl run hoss:hoss-validate
+```
+
+**Note**: RC1 has a known Demon workspace mount issue. Use manual Docker execution as workaround (see release notes).
+
+### Install from Source
+
+```bash
+git clone https://github.com/afewell-hh/hoss
+cd hoss
+make app-pack-build
+DEMON_APP_HOME=/tmp/app-home demonctl app install ./app-pack
+```
+
 ## Review Kit
 
 **Strict validation** with digest-pinned hhfab container, zero-warning enforcement, and comprehensive security hardening.
