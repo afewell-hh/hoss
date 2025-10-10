@@ -20,9 +20,9 @@
 - [x] cosign installed and configured
 - [x] Local signing/verification tested (`make app-pack-sign`, `make app-pack-verify`)
 - [x] app-pack.yaml signing enabled (`cosign.enabled: true`)
-- [ ] GitHub Actions workflow updated with OIDC signing
-- [ ] Release workflow uploads signature bundle
-- [ ] README includes signature verification instructions
+- [x] GitHub Actions workflow updated with OIDC signing
+- [x] Release workflow uploads signature bundle
+- [x] README includes signature verification instructions
 
 ### Documentation
 - [x] Installation instructions (README)
@@ -121,7 +121,7 @@
 ### Changes for GA
 - [x] Enable cosign signing
 - [x] Add signature verification to README
-- [ ] Update release workflow for signature upload
+- [x] Update release workflow for signature upload
 - [ ] Re-run confirm-on-main after Demon fix
 - [ ] Final performance baseline
 - [ ] Update version to v0.1.0 (drop -rc1 suffix)
