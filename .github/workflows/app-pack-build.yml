@@ -109,7 +109,9 @@ jobs:
         uses: sigstore/cosign-installer@053f9b74638557590800a301da1ba82351507e2c  # v3.8.1
 
       - name: Build App Pack
-        run: make app-pack-build
+        run: |
+          make app-pack-build
+          ls -la .artifacts/
 
       - name: Sign App Pack with cosign
         env:
@@ -118,9 +120,12 @@ jobs:
           set -euo pipefail
           echo "Signing HOSS App Pack with cosign..."
 
+          ls -la .artifacts/
+
           cosign sign-blob --yes .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz \
             --bundle .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.bundle
 
+          ls -la .artifacts/
           echo "✅ Signed App Pack"
 
       - name: Upload App Pack
