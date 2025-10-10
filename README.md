@@ -27,6 +27,21 @@ DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
 
 **Note**: RC1 has a known Demon workspace mount issue. Use manual Docker execution as workaround (see release notes).
 
+### Verify Signature (Optional)
+
+For GA releases, verify the app-pack signature with cosign:
+
+```bash
+# Download signature bundle
+wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0-rc1/hoss-app-pack-v0.1.0.tar.gz.bundle
+
+# Verify with cosign
+cosign verify-blob hoss-app-pack-v0.1.0.tar.gz \
+  --bundle hoss-app-pack-v0.1.0.tar.gz.bundle \
+  --certificate-identity-regexp="^https://github.com/afewell-hh/.+@" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+```
+
 ### Install from Source
 
 ```bash
