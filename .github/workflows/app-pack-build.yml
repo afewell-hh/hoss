@@ -119,8 +119,7 @@ jobs:
           echo "Signing HOSS App Pack with cosign..."
 
           cosign sign-blob --yes .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz \
-            --output-signature .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.sig \
-            --output-certificate .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.cert
+            --bundle .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.bundle
 
           echo "✅ Signed App Pack"
 
@@ -130,8 +129,7 @@ jobs:
           name: hoss-app-pack
           path: |
             .artifacts/hoss-app-pack-v*.tar.gz
-            .artifacts/hoss-app-pack-v*.tar.gz.sig
-            .artifacts/hoss-app-pack-v*.tar.gz.cert
+            .artifacts/hoss-app-pack-v*.tar.gz.bundle
           retention-days: 90
 
   integration-test:
@@ -175,12 +173,15 @@ jobs:
             sudo mv cosign-linux-amd64 /usr/local/bin/cosign
           fi
 
-          # Note: Verification will work once the artifact is properly signed in CI
-          # For now, just check that signature files exist
-          test -f .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.sig
-          test -f .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.cert
+          # Verify signature bundle
+          test -f .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.bundle
 
-          echo "✅ Signature files present"
+          cosign verify-blob .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz \
+            --bundle .artifacts/hoss-app-pack-v${APP_PACK_VERSION}.tar.gz.bundle \
+            --certificate-identity-regexp="^https://github.com/afewell-hh/.+@" \
+            --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+          echo "✅ Signature verified"
 
   compatibility-matrix:
     name: Compatibility Check

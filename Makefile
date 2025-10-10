@@ -1,6 +1,6 @@
 .PHONY: review-kit review-kit-strict bundle/preview bundle/check bundle/verify bundle/keys \
 	hossctl hossctl-build hossctl-install hossctl-test \
-	app-pack app-pack-build app-pack-sign app-pack-test app-pack-validate-contracts
+	app-pack app-pack-build app-pack-sign app-pack-verify app-pack-test app-pack-validate-contracts
 
 review-kit:
 	@bash scripts/hhfab-validate.sh
@@ -77,19 +77,33 @@ app-pack-build:
 app-pack-sign:
 	@echo "Signing HOSS App Pack with cosign..."
 	@test -f .artifacts/hoss-app-pack-v0.1.0.tar.gz || { echo "Run 'make app-pack-build' first"; exit 1; }
-	@cosign sign-blob --yes .artifacts/hoss-app-pack-v0.1.0.tar.gz \
-	  --output-signature .artifacts/hoss-app-pack-v0.1.0.tar.gz.sig \
-	  --output-certificate .artifacts/hoss-app-pack-v0.1.0.tar.gz.cert
-	@echo "✅ Signed: .artifacts/hoss-app-pack-v0.1.0.tar.gz.sig"
+	@if [ -f .artifacts/signing/cosign.key ]; then \
+		echo "Using local key for signing..."; \
+		COSIGN_PASSWORD="" cosign sign-blob --yes --key .artifacts/signing/cosign.key \
+			.artifacts/hoss-app-pack-v0.1.0.tar.gz \
+			--bundle .artifacts/hoss-app-pack-v0.1.0.tar.gz.bundle; \
+	else \
+		echo "Using keyless (OIDC) signing..."; \
+		cosign sign-blob --yes .artifacts/hoss-app-pack-v0.1.0.tar.gz \
+			--bundle .artifacts/hoss-app-pack-v0.1.0.tar.gz.bundle; \
+	fi
+	@echo "✅ Signed: .artifacts/hoss-app-pack-v0.1.0.tar.gz.bundle"
 
 app-pack-verify:
 	@echo "Verifying HOSS App Pack signature..."
-	@test -f .artifacts/hoss-app-pack-v0.1.0.tar.gz.sig || { echo "Run 'make app-pack-sign' first"; exit 1; }
-	@cosign verify-blob .artifacts/hoss-app-pack-v0.1.0.tar.gz \
-	  --signature .artifacts/hoss-app-pack-v0.1.0.tar.gz.sig \
-	  --certificate .artifacts/hoss-app-pack-v0.1.0.tar.gz.cert \
-	  --certificate-identity-regexp="^https://github.com/.+/.+@" \
-	  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+	@test -f .artifacts/hoss-app-pack-v0.1.0.tar.gz.bundle || { echo "Run 'make app-pack-sign' first"; exit 1; }
+	@if [ -f .artifacts/signing/cosign.pub ]; then \
+		echo "Verifying with local public key..."; \
+		cosign verify-blob .artifacts/hoss-app-pack-v0.1.0.tar.gz \
+			--bundle .artifacts/hoss-app-pack-v0.1.0.tar.gz.bundle \
+			--key .artifacts/signing/cosign.pub; \
+	else \
+		echo "Verifying with OIDC certificate..."; \
+		cosign verify-blob .artifacts/hoss-app-pack-v0.1.0.tar.gz \
+			--bundle .artifacts/hoss-app-pack-v0.1.0.tar.gz.bundle \
+			--certificate-identity-regexp="^https://github.com/.+/.+@" \
+			--certificate-oidc-issuer=https://token.actions.githubusercontent.com; \
+	fi
 	@echo "✅ Signature verified"
 
 app-pack-test:
