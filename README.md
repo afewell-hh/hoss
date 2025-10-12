@@ -13,8 +13,8 @@
 Download and install the latest release:
 
 ```bash
-# Download RC1
-wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0-rc1/hoss-app-pack-v0.1.0.tar.gz
+# Download latest release
+wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz
 tar -xzf hoss-app-pack-v0.1.0.tar.gz
 
 # Install with Demon
@@ -25,13 +25,13 @@ DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
   demonctl run hoss:hoss-validate
 ```
 
-### Verify Signature (Optional)
+### Verify Signature
 
-For GA releases, verify the app-pack signature with cosign:
+Verify the app-pack signature with cosign:
 
 ```bash
 # Download signature bundle
-wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0-rc1/hoss-app-pack-v0.1.0.tar.gz.bundle
+wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz.bundle
 
 # Verify with cosign
 cosign verify-blob hoss-app-pack-v0.1.0.tar.gz \
