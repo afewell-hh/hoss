@@ -71,20 +71,9 @@ jobs:
                   - 'scripts/hhfab-*.sh'
       - name: Determine strict requirement
         id: strict-needed
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          STRICT_CHANGED: ${{ steps['strict-changes'].outputs.strict }}
         run: |
           set -Eeuo pipefail
-          if [[ "${EVENT_NAME}" != "pull_request" ]]; then
-            echo "strict_needed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if [[ "${STRICT_CHANGED}" == "true" ]]; then
-            echo "strict_needed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "strict_needed=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "strict_needed=true" >> "$GITHUB_OUTPUT"
       - name: Summarize strict-triggering changes
         if: steps['strict-changes'].outputs.strict == 'true'
         shell: bash
