@@ -25,8 +25,6 @@ DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
   demonctl run hoss:hoss-validate
 ```
 
-**Note**: RC1 has a known Demon workspace mount issue. Use manual Docker execution as workaround (see release notes).
-
 ### Install from Source
 
 ```bash
