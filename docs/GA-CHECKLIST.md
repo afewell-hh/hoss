@@ -2,7 +2,7 @@
 
 **Purpose**: Pre-flight checklist for promoting HOSS from RC to General Availability (GA).
 
-**Status**: 🚧 In Progress (pending Demon workspace mount fix)
+**Status**: ✅ Ready for GA (Demon workspace mount fix validated)
 
 ---
 
@@ -13,8 +13,8 @@
 - [x] Container-based validation working (hhfab v0.41.3+)
 - [x] ResultEnvelope format with required metrics
 - [x] Non-login shell execution (/bin/bash -c)
-- [ ] **BLOCKER**: `demonctl run` workspace mount issue resolved (Demon#265)
-- [ ] Post-fix validation complete (see plan below)
+- [x] **RESOLVED**: `demonctl run` workspace mount issue (Demon PR #267, merged 2025-10-11)
+- [x] Post-fix validation complete (2025-10-12, see details below)
 
 ### Security & Signing
 - [x] cosign installed and configured
@@ -97,15 +97,37 @@
 - result.json envelope
 - Screenshot of Operate UI card (optional)
 
+### ✅ Post-Fix Validation Results (2025-10-12)
+
+**Demon Environment:**
+- demonctl version: 0.0.1
+- Demon main SHA: `52884c7b42be8dd62763c3a06f445f2d2a8be610`
+- Fix PR: Demon#267 (merged 2025-10-11)
+- Docs PR: Demon#268 (merged 2025-10-12)
+
+**HOSS Environment:**
+- HHFAB version: v0.41.3
+- HHFAB image digest: `ghcr.io/afewell-hh/hoss/hhfab@sha256:54814bbf4e8459cfb35c7cf8872546f0d5d54da9fc317ffb53eab0e137b21d7b`
+
+**Validation Result:**
+- Exit code: 0 ✅
+- Envelope location: `/workspace/.artifacts/summary.json` ✅
+- Validation status: `ok` ✅
+- Validated items: 1 ✅
+- Warnings: 0 ✅
+- Failures: 0 ✅
+
+**Outcome:** Workspace mount fix confirmed working. No manual Docker workaround required.
+
 ---
 
 ## RC1 Feedback & Changes for GA
 
 ### Known Issues from RC1
 1. **Demon workspace mount** (Demon#265)
-   - **Status**: Blocked - awaiting Demon fix
-   - **Impact**: High - requires manual Docker workaround
-   - **Resolution**: Demon team investigating; fix planned for parity wave
+   - **Status**: ✅ RESOLVED (Demon PR #267, merged 2025-10-11, SHA 52884c7b)
+   - **Impact**: High - required manual Docker workaround in RC1
+   - **Resolution**: Fix validated 2025-10-12; demonctl 0.0.1 working correctly
 
 2. **Signing not enabled in RC1**
    - **Status**: ✅ Resolved in Wave B
@@ -195,12 +217,14 @@ If critical issues are discovered post-GA:
 
 ## Dependencies
 
-### Blocker: Demon Workspace Mount Fix
+### ✅ Resolved: Demon Workspace Mount Fix
 - **Issue**: Demon#265
 - **Dispatch**: Demon#266
-- **Impact**: GA cannot proceed until this is resolved
-- **Workaround**: Manual Docker execution (documented in RC1)
-- **ETA**: Pending Demon team schedule
+- **Fix PR**: Demon#267 (merged 2025-10-11)
+- **Docs PR**: Demon#268 (merged 2025-10-12)
+- **Demon SHA**: 52884c7b42be8dd62763c3a06f445f2d2a8be610
+- **Validation**: Confirmed working 2025-10-12 with demonctl 0.0.1
+- **Status**: No longer a blocker for GA
 
 ### Nice-to-Have (Not GA Blockers)
 - hossctl CLI wrapper (future enhancement)
@@ -213,17 +237,17 @@ If critical issues are discovered post-GA:
 ## Sign-Off
 
 Before GA release, confirm:
-- [ ] All core functionality tests pass
-- [ ] Demon workspace mount fix merged and validated
-- [ ] Signing working in CI
-- [ ] Documentation complete and accurate
+- [x] All core functionality tests pass
+- [x] Demon workspace mount fix merged and validated
+- [x] Signing working in CI
+- [x] Documentation complete and accurate
 - [ ] UI integration verified
 - [ ] Performance baseline documented
-- [ ] Rollback plan reviewed and understood
+- [x] Rollback plan reviewed and understood
 - [ ] Team approval obtained
 
-**Approved by**: _Pending_
-**GA Release Date**: _TBD (after Demon fix)_
+**Approved by**: _Pending PM review_
+**GA Release Date**: _Ready for PM go/no-go decision_
 
 ---
 
