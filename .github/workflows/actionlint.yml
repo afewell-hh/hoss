@@ -1,12 +1,6 @@
 name: actionlint
 on:
   pull_request:
-    paths:
-      - '.github/workflows/**'
-      - '.github/actions/**'
-      - '.github/hhfab-problem-matcher.json'
-      - '.github/**/*.yml'
-      - '.github/**/*.yaml'
 permissions:
   contents: read
 concurrency:
