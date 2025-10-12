@@ -2,12 +2,6 @@ name: review-kit
 run-name: "review-kit @ ${{ github.sha }}"
 on:
   pull_request:
-    paths:
-      - 'scripts/**'
-      - '.github/actions/**'
-      - '.github/workflows/review-kit.yml'
-      - 'contracts/**'
-      - 'samples/**'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
