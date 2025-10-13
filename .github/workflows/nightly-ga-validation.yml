@@ -1,0 +1,247 @@
+name: Nightly GA Validation (v0.1.0)
+run-name: "nightly-ga-validation @ ${{ github.sha }}"
+
+on:
+  schedule:
+    # Run nightly at 03:30 UTC
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'GA tag to validate (default: v0.1.0)'
+        type: string
+        default: 'v0.1.0'
+
+permissions:
+  contents: read
+  issues: write
+  packages: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GA_TAG: ${{ inputs.tag || 'v0.1.0' }}
+  HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+  HHFAB_MATCHER_PATH: .github/hhfab-problem-matcher.json
+  ARTIFACT_DIR: .artifacts/nightly-ga
+
+jobs:
+  validate-ga-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      summary_path: ${{ steps.summary.outputs.path }}
+      run_url: ${{ steps.run-info.outputs.url }}
+    steps:
+      - name: Record run information
+        id: run-info
+        run: |
+          echo "url=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> "$GITHUB_OUTPUT"
+          echo "### Nightly GA Validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tag**: ${{ env.GA_TAG }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Run**: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Triggered**: ${{ github.event_name }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout repository with full history
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608  # v4.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Checkout GA tag
+        run: |
+          set -Eeuo pipefail
+          echo "Checking out tag: ${{ env.GA_TAG }}"
+          git checkout "${{ env.GA_TAG }}"
+          echo "Current commit:"
+          git log -1 --oneline
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Checked out**: $(git describe --tags --always)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify tag and matrix file
+        run: |
+          set -Eeuo pipefail
+          if [[ ! -f ".github/review-kit/matrix.txt" ]]; then
+            echo "::error::Matrix file missing in tag ${{ env.GA_TAG }}"
+            exit 1
+          fi
+          echo "Matrix file found, sample count: $(grep -c -v -e '^#' -e '^$' .github/review-kit/matrix.txt || echo 0)"
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
+
+      - name: Verify HHFAB_IMAGE_DIGEST
+        run: |
+          set -Eeuo pipefail
+          if [[ -z "${HHFAB_IMAGE_DIGEST:-}" ]]; then
+            echo "::error::HHFAB_IMAGE_DIGEST is not set"
+            exit 1
+          fi
+          if [[ ! "${HHFAB_IMAGE_DIGEST}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::HHFAB_IMAGE_DIGEST must be digest-pinned"
+            exit 1
+          fi
+          echo "Using HHFAB image: ${HHFAB_IMAGE_DIGEST}"
+
+      - name: Register hhfab matcher
+        run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
+
+      - name: Run smoke-local validation
+        id: smoke
+        uses: ./.github/actions/hhfab-validate-fixed
+        with:
+          matrix: ${{ steps.read-matrix.outputs.matrix }}
+        continue-on-error: true
+
+      - name: Read matrix for strict validation
+        id: read-matrix
+        run: |
+          set -Eeuo pipefail
+          MATRIX_FILE=".github/review-kit/matrix.txt"
+          if [[ ! -f "${MATRIX_FILE}" ]]; then
+            echo "::error::Matrix file missing"
+            exit 1
+          fi
+          echo "matrix<<EOF" >> $GITHUB_OUTPUT
+          sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "${MATRIX_FILE}" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run strict validation
+        id: strict
+        uses: ./.github/actions/hhfab-validate-fixed
+        with:
+          strict: 'true'
+          use-container: 'true'
+          container-image: ${{ env.HHFAB_IMAGE_DIGEST }}
+          matrix: ${{ steps.read-matrix.outputs.matrix }}
+
+      - name: Set summary path
+        id: summary
+        if: always()
+        run: |
+          path="${{ steps.strict.outputs.summary_path }}"
+          if [[ -z "$path" ]]; then
+            path="${{ steps.smoke.outputs.summary_path }}"
+          fi
+          echo "path=${path}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify validation results
+        if: always()
+        run: |
+          set -Eeuo pipefail
+          p="${{ steps.summary.outputs.path }}"
+          if [[ -z "$p" || ! -f "$p" ]]; then
+            echo "::error::Validation summary missing"
+            exit 1
+          fi
+
+          status=$(jq -r '.status // "error"' "$p")
+          validated=$(jq -r '.counts.validated // 0' "$p")
+          warnings=$(jq -r '.counts.warnings // 0' "$p")
+          failures=$(jq -r '.counts.failures // 0' "$p")
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Validation Results" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | --- |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Status | ${status} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Validated | ${validated} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Warnings | ${warnings} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Failures | ${failures} |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$status" != "ok" ]]; then
+            echo "::error::Validation failed with status: ${status}"
+            exit 1
+          fi
+
+          if [[ "$validated" -eq 0 ]]; then
+            echo "::error::No validations performed"
+            exit 1
+          fi
+
+      - name: Remove hhfab matcher
+        if: always()
+        run: echo "::remove-matcher owner=hhfab::"
+
+      - name: Upload summary artifact
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        with:
+          name: review-kit-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.summary.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Post success to issue
+        if: success()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        with:
+          script: |
+            const runUrl = '${{ steps.run-info.outputs.url }}';
+            const tag = '${{ env.GA_TAG }}';
+            const timestamp = new Date().toISOString();
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 61,
+              body: `✅ **Nightly GA Validation Passed**\n\n` +
+                    `- **Tag**: ${tag}\n` +
+                    `- **Run**: [${context.runId}](${runUrl})\n` +
+                    `- **Time**: ${timestamp}\n` +
+                    `- **Artifact**: review-kit-summary-${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}\n\n` +
+                    `All validations passed successfully.`
+            });
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7.0.1
+        with:
+          script: |
+            const runUrl = '${{ steps.run-info.outputs.url }}';
+            const tag = '${{ env.GA_TAG }}';
+            const timestamp = new Date().toISOString();
+
+            // Check if issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-failure,nightly-ga-validation',
+              state: 'open'
+            });
+
+            const body = `## Nightly GA Validation Failed\n\n` +
+                        `- **Tag**: ${tag}\n` +
+                        `- **Run**: [${context.runId}](${runUrl})\n` +
+                        `- **Time**: ${timestamp}\n` +
+                        `- **Artifact**: review-kit-summary-${context.runId}-${process.env.GITHUB_RUN_ATTEMPT}\n\n` +
+                        `### Action Required\n\n` +
+                        `1. Review the [workflow run logs](${runUrl})\n` +
+                        `2. Check summary artifact for detailed failure information\n` +
+                        `3. Investigate if this is a regression in the GA tag or a temporary issue\n\n` +
+                        `---\n` +
+                        `*Auto-generated by nightly GA validation failure*`;
+
+            if (issues.data.length > 0) {
+              // Append to existing issue
+              const issue = issues.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: "---\n" + body
+              });
+              console.log("Updated issue #" + issue.number);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🔴 Nightly GA validation failed for ${tag}`,
+                body: body,
+                labels: ['ci-failure', 'nightly-ga-validation', 'needs-triage']
+              });
+              console.log("Created issue #" + newIssue.data.number);
+            }
