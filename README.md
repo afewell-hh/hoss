@@ -6,6 +6,55 @@
 
 **Hedgehog Operational Support System** - Fabric topology validation for Hedgehog Open Network Fabric.
 
+## 🎉 v0.1.0 Generally Available
+
+HOSS v0.1.0 is now generally available! This release includes:
+
+- ✅ Complete App Pack v0.1 structure with Demon platform integration
+- 🔐 Cosign OIDC keyless signing for all releases
+- ✅ Container-based validation with HHFAB v0.41.3+
+- ✅ Resolved Demon workspace mount issues from RC1
+
+**[Download v0.1.0](https://github.com/afewell-hh/hoss/releases/tag/v0.1.0)** | **[Release Notes](https://github.com/afewell-hh/hoss/releases/tag/v0.1.0)** | **[Getting Started](#getting-started)**
+
+## Getting Started
+
+Get up and running with HOSS in 5 minutes:
+
+### Prerequisites
+
+- [Demon platform](https://github.com/githedgehog/demon) with demonctl 0.0.1+
+- [cosign](https://docs.sigstore.dev/cosign/installation/) for signature verification (optional but recommended)
+
+### Quick Start
+
+```bash
+# 1. Download and verify the release
+wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz
+wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz.bundle
+
+cosign verify-blob hoss-app-pack-v0.1.0.tar.gz \
+  --bundle hoss-app-pack-v0.1.0.tar.gz.bundle \
+  --certificate-identity-regexp="^https://github.com/afewell-hh/.+@" \
+  --certificate-oidc-issuer=https://token.actions.githubusercontent.com
+
+# 2. Extract and install
+tar -xzf hoss-app-pack-v0.1.0.tar.gz
+DEMON_APP_HOME=/tmp/app-home demonctl app install ./app-pack
+
+# 3. Run your first validation
+DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=$(id -u):$(id -g) \
+  demonctl run hoss:hoss-validate
+
+# 4. Check the results
+cat result.json | jq .
+```
+
+**Next steps:**
+- See [Installation](#installation) for alternative installation methods
+- Read [docs/quickstart.md](docs/quickstart.md) for detailed examples
+- Check [samples/](samples/) for example topology files
+
 ## Installation
 
 ### Install from Release (Recommended)

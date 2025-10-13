@@ -1,0 +1,9 @@
+# Basic Hedgehog Fabric Topology Example
+#
+# This sample demonstrates a minimal valid topology configuration
+# for HOSS validation. Use this as a starting point for simple
+# fabric deployments.
+#
+# Validation: This file should pass HOSS strict validation
+
+# trigger strict

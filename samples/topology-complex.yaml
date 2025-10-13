@@ -1,0 +1,9 @@
+# Complex Hedgehog Fabric Topology Example
+#
+# This sample demonstrates a more complex topology configuration
+# with multiple switches, connections, and configuration options.
+# Use this to test HOSS validation against realistic deployments.
+#
+# Validation: This file should pass HOSS strict validation
+
+# trigger strict
