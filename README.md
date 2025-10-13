@@ -6,31 +6,25 @@
 
 **Hedgehog Operational Support System** - Fabric topology validation for Hedgehog Open Network Fabric.
 
-## 🚀 v0.2.0-rc1 Release Candidate
+## 🎉 v0.2.0 Generally Available
 
-HOSS v0.2.0-rc1 brings multi-topology aggregation, streaming validation, and enhanced metadata:
+HOSS v0.2.0 is now generally available with multi-topology aggregation, streaming validation, and enhanced metadata:
 
 - ✅ **Multi-topology validation** with parallel execution (RFC 0001)
 - ✅ **hossctl CLI** with SSE streaming support (RFC 0003)
 - ✅ **Enhanced metadata** fields: tool.gitSha, matrix.details, execution context (RFC 0002)
 - ✅ **Performance hardening** with threshold testing (RFC 0004)
 - 🔐 Cosign OIDC keyless signing for all releases
-- ✅ Backward compatible with v0.1.0
+- ✅ **Fully backward compatible** with v0.1.0
 
-**[Download v0.2.0-rc1](https://github.com/afewell-hh/hoss/releases/tag/v0.2.0-rc1)** | **[RC1 Checklist](docs/v0.2.0-rc1-checklist.md)** | **[Getting Started](#getting-started)**
+**[Download v0.2.0](https://github.com/afewell-hh/hoss/releases/tag/v0.2.0)** | **[Release Notes](https://github.com/afewell-hh/hoss/releases/tag/v0.2.0)** | **[Upgrade from v0.1.0](docs/UPGRADE-v0.1.0-to-v0.2.0-rc1.md)** | **[Getting Started](#getting-started)**
 
 ---
 
-## 🎉 v0.1.0 Generally Available
+## Previous Releases
 
-HOSS v0.1.0 is now generally available! This release includes:
-
-- ✅ Complete App Pack v0.1 structure with Demon platform integration
-- 🔐 Cosign OIDC keyless signing for all releases
-- ✅ Container-based validation with HHFAB v0.41.3+
-- ✅ Resolved Demon workspace mount issues from RC1
-
-**[Download v0.1.0](https://github.com/afewell-hh/hoss/releases/tag/v0.1.0)** | **[Release Notes](https://github.com/afewell-hh/hoss/releases/tag/v0.1.0)** | **[Getting Started](#getting-started)**
+- **v0.1.0** - [Download](https://github.com/afewell-hh/hoss/releases/tag/v0.1.0) | [Release Notes](https://github.com/afewell-hh/hoss/releases/tag/v0.1.0)
+- **v0.2.0-rc1** - [Download](https://github.com/afewell-hh/hoss/releases/tag/v0.2.0-rc1) | [RC1 Checklist](docs/v0.2.0-rc1-checklist.md)
 
 ## Getting Started
 
@@ -45,16 +39,16 @@ Get up and running with HOSS in 5 minutes:
 
 ```bash
 # 1. Download and verify the release
-wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz
-wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz.bundle
+wget https://github.com/afewell-hh/hoss/releases/download/v0.2.0/hoss-app-pack-v0.2.0.tar.gz
+wget https://github.com/afewell-hh/hoss/releases/download/v0.2.0/hoss-app-pack-v0.2.0.tar.gz.bundle
 
-cosign verify-blob hoss-app-pack-v0.1.0.tar.gz \
-  --bundle hoss-app-pack-v0.1.0.tar.gz.bundle \
+cosign verify-blob hoss-app-pack-v0.2.0.tar.gz \
+  --bundle hoss-app-pack-v0.2.0.tar.gz.bundle \
   --certificate-identity-regexp="^https://github.com/afewell-hh/.+@" \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com
 
 # 2. Extract and install
-tar -xzf hoss-app-pack-v0.1.0.tar.gz
+tar -xzf hoss-app-pack-v0.2.0.tar.gz
 DEMON_APP_HOME=/tmp/app-home demonctl app install ./app-pack
 
 # 3. Run your first validation
@@ -78,13 +72,19 @@ Download and install the latest release:
 
 ```bash
 # Download latest release
-wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz
-tar -xzf hoss-app-pack-v0.1.0.tar.gz
+wget https://github.com/afewell-hh/hoss/releases/download/v0.2.0/hoss-app-pack-v0.2.0.tar.gz
+tar -xzf hoss-app-pack-v0.2.0.tar.gz
 
 # Install with Demon
 DEMON_APP_HOME=/tmp/app-home demonctl app install ./app-pack
 
-# Run validation
+# Run validation (single topology)
+DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
+  demonctl run hoss:hoss-validate
+
+# Run validation (multi-topology with parallel execution)
+export HHFAB_MATRIX="topology-1.yaml,topology-2.yaml,topology-3.yaml"
+export HOSS_CONCURRENCY=4
 DEMON_DEBUG=1 DEMON_APP_HOME=/tmp/app-home DEMON_CONTAINER_USER=1000:1000 \
   demonctl run hoss:hoss-validate
 ```
@@ -95,11 +95,11 @@ Verify the app-pack signature with cosign:
 
 ```bash
 # Download signature bundle
-wget https://github.com/afewell-hh/hoss/releases/download/v0.1.0/hoss-app-pack-v0.1.0.tar.gz.bundle
+wget https://github.com/afewell-hh/hoss/releases/download/v0.2.0/hoss-app-pack-v0.2.0.tar.gz.bundle
 
 # Verify with cosign
-cosign verify-blob hoss-app-pack-v0.1.0.tar.gz \
-  --bundle hoss-app-pack-v0.1.0.tar.gz.bundle \
+cosign verify-blob hoss-app-pack-v0.2.0.tar.gz \
+  --bundle hoss-app-pack-v0.2.0.tar.gz.bundle \
   --certificate-identity-regexp="^https://github.com/afewell-hh/.+@" \
   --certificate-oidc-issuer=https://token.actions.githubusercontent.com
 ```
