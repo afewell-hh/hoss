@@ -2,7 +2,7 @@ apiVersion: demon.io/v1
 kind: AppPack
 metadata:
   name: hoss
-  version: 0.2.0-rc1
+  version: 0.2.0
   description: Hedgehog Operational Support System - Fabric topology validation for Hedgehog Open Network Fabric
   repository: https://github.com/afewell-hh/hoss
   license: Apache-2.0

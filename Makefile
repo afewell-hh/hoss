@@ -69,25 +69,25 @@ hossctl-cross:
 app-pack: app-pack-build
 
 app-pack-build:
-	@echo "Building HOSS App Pack v0.2.0-rc1..."
+	@echo "Building HOSS App Pack v0.2.0..."
 	@mkdir -p .artifacts
-	@tar -czf .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz app-pack/
-	@echo "✅ Built: .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz"
+	@tar -czf .artifacts/hoss-app-pack-v0.2.0.tar.gz app-pack/
+	@echo "✅ Built: .artifacts/hoss-app-pack-v0.2.0.tar.gz"
 
 app-pack-sign:
 	@echo "Signing HOSS App Pack with cosign..."
-	@test -f .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz || { echo "Run 'make app-pack-build' first"; exit 1; }
+	@test -f .artifacts/hoss-app-pack-v0.2.0.tar.gz || { echo "Run 'make app-pack-build' first"; exit 1; }
 	@if [ -f .artifacts/signing/cosign.key ]; then \
 		echo "Using local key for signing..."; \
 		COSIGN_PASSWORD="" cosign sign-blob --yes --key .artifacts/signing/cosign.key \
-			.artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz \
-			--bundle .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz.bundle; \
+			.artifacts/hoss-app-pack-v0.2.0.tar.gz \
+			--bundle .artifacts/hoss-app-pack-v0.2.0.tar.gz.bundle; \
 	else \
 		echo "Using keyless (OIDC) signing..."; \
-		cosign sign-blob --yes .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz \
-			--bundle .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz.bundle; \
+		cosign sign-blob --yes .artifacts/hoss-app-pack-v0.2.0.tar.gz \
+			--bundle .artifacts/hoss-app-pack-v0.2.0.tar.gz.bundle; \
 	fi
-	@echo "✅ Signed: .artifacts/hoss-app-pack-v0.2.0-rc1.tar.gz.bundle"
+	@echo "✅ Signed: .artifacts/hoss-app-pack-v0.2.0.tar.gz.bundle"
 
 app-pack-verify:
 	@echo "Verifying HOSS App Pack signature..."
