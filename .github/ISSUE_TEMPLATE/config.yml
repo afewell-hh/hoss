@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/afewell-hh/hoss/blob/main/README.md
+    about: Read the HOSS documentation and quickstart guide
+  - name: Support Runbook
+    url: https://github.com/afewell-hh/hoss/blob/main/docs/runbooks/support.md
+    about: Learn how to collect diagnostics and troubleshoot issues

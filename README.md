@@ -183,6 +183,14 @@ Digest-pinned, network-isolated, read-only container validation with comprehensi
 3. Submit PR; strict validation will run automatically
 4. All enforcement gates must pass before merge
 
+## Getting Help
+
+- **Quickstart Guide**: [docs/quickstart.md](docs/quickstart.md)
+- **Support Runbook**: [docs/runbooks/support.md](docs/runbooks/support.md) - Troubleshooting and diagnostics collection
+- **Bug Reports**: [Open an issue](https://github.com/afewell-hh/hoss/issues/new?template=bug_report.md)
+- **Feature Requests**: [Request a feature](https://github.com/afewell-hh/hoss/issues/new?template=feature_request.md)
+- **Review Kit Issues**: [docs/runbooks/review-kit.md](docs/runbooks/review-kit.md)
+
 ## License
 
 See LICENSE file for details.
