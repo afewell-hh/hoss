@@ -1,0 +1,42 @@
+{
+  "version": "1.0",
+  "updated": "2025-10-13",
+  "description": "Performance thresholds for HOSS validation (RFC 0004)",
+  "thresholds": {
+    "small": {
+      "maxTimeMs": 3000,
+      "maxMemoryMB": 100,
+      "description": "Baseline - 2-5 switches",
+      "targetFile": "samples/topology-basic.yaml"
+    },
+    "medium": {
+      "maxTimeMs": 5000,
+      "maxMemoryMB": 200,
+      "description": "Small enterprise - 20 switches",
+      "targetFile": "samples/perf/topology-medium.yaml"
+    },
+    "large": {
+      "maxTimeMs": 30000,
+      "maxMemoryMB": 500,
+      "description": "Large enterprise - 100 switches",
+      "targetFile": "samples/perf/topology-large.yaml"
+    },
+    "xl": {
+      "maxTimeMs": 120000,
+      "maxMemoryMB": 1024,
+      "description": "Stress test - 500 switches (informational only)",
+      "targetFile": "samples/perf/topology-xl.yaml"
+    }
+  },
+  "tolerances": {
+    "time": 1.1,
+    "memory": 1.2,
+    "description": "Tolerance factors: 10% time variance, 20% memory variance"
+  },
+  "notes": [
+    "Thresholds are based on GitHub Actions runners (2 vCPU, 7GB RAM)",
+    "XL tier is stress test only - failures are informational, not blocking",
+    "Memory measurements use peak RSS from /usr/bin/time -v",
+    "Time measurements are wall-clock time including container startup"
+  ]
+}

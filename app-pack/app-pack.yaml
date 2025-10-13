@@ -2,7 +2,7 @@ apiVersion: demon.io/v1
 kind: AppPack
 metadata:
   name: hoss
-  version: 0.1.0
+  version: 0.2.0-rc1
   description: Hedgehog Operational Support System - Fabric topology validation for Hedgehog Open Network Fabric
   repository: https://github.com/afewell-hh/hoss
   license: Apache-2.0
@@ -22,12 +22,15 @@ contracts:
   - id: hoss/validate.result
     version: 0.1.0
     path: contracts/hoss/validate.result.json
+  - id: hoss/validate.result
+    version: 0.2.0
+    path: contracts/hoss/validate.result.v0.2.0.json
 
 capsules:
   - type: container-exec
     name: hhfab
     imageDigest: ghcr.io/afewell-hh/hoss/hhfab@sha256:54814bbf4e8459cfb35c7cf8872546f0d5d54da9fc317ffb53eab0e137b21d7b
-    command: ["/bin/bash", "-c", "set -Eeuo pipefail; /workspace/capsules/hhfab/scripts/hhfab-validate.sh"]
+    command: ["/bin/bash", "-c", "set -Eeuo pipefail; /workspace/capsules/hhfab/scripts/hhfab-validate-v0.2.sh"]
     env:
       TMPDIR: /tmp
       HHFAB_CACHE_DIR: /tmp/.hhfab-cache
@@ -68,3 +71,10 @@ ui:
           - counts.failures
           - tool.version
           - tool.imageDigest
+          - tool.gitSha
+          - tool.gitShort
+          - matrix.enabled
+          - matrix.concurrency
+          - matrix.targets
+          - execution.startTime
+          - execution.endTime

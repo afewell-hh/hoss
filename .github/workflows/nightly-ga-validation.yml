@@ -87,14 +87,7 @@ jobs:
       - name: Register hhfab matcher
         run: echo "::add-matcher::${HHFAB_MATCHER_PATH}"
 
-      - name: Run smoke-local validation
-        id: smoke
-        uses: ./.github/actions/hhfab-validate-fixed
-        with:
-          matrix: ${{ steps.read-matrix.outputs.matrix }}
-        continue-on-error: true
-
-      - name: Read matrix for strict validation
+      - name: Read matrix for validation
         id: read-matrix
         run: |
           set -Eeuo pipefail
@@ -106,6 +99,13 @@ jobs:
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
           sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "${MATRIX_FILE}" >> "$GITHUB_OUTPUT"
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run smoke-local validation
+        id: smoke
+        uses: ./.github/actions/hhfab-validate-fixed
+        with:
+          matrix: ${{ steps.read-matrix.outputs.matrix }}
+        continue-on-error: true
 
       - name: Run strict validation
         id: strict

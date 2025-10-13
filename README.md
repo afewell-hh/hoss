@@ -6,6 +6,21 @@
 
 **Hedgehog Operational Support System** - Fabric topology validation for Hedgehog Open Network Fabric.
 
+## 🚀 v0.2.0-rc1 Release Candidate
+
+HOSS v0.2.0-rc1 brings multi-topology aggregation, streaming validation, and enhanced metadata:
+
+- ✅ **Multi-topology validation** with parallel execution (RFC 0001)
+- ✅ **hossctl CLI** with SSE streaming support (RFC 0003)
+- ✅ **Enhanced metadata** fields: tool.gitSha, matrix.details, execution context (RFC 0002)
+- ✅ **Performance hardening** with threshold testing (RFC 0004)
+- 🔐 Cosign OIDC keyless signing for all releases
+- ✅ Backward compatible with v0.1.0
+
+**[Download v0.2.0-rc1](https://github.com/afewell-hh/hoss/releases/tag/v0.2.0-rc1)** | **[RC1 Checklist](docs/v0.2.0-rc1-checklist.md)** | **[Getting Started](#getting-started)**
+
+---
+
 ## 🎉 v0.1.0 Generally Available
 
 HOSS v0.1.0 is now generally available! This release includes:

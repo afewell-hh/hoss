@@ -1,0 +1,527 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# hossctl - HOSS CLI wrapper with streaming support
+# Implements RFC 0003: hossctl CLI with SSE streaming from Demon
+
+VERSION="0.2.0"
+
+# Default configuration
+DEMON_APP_HOME="${DEMON_APP_HOME:-/tmp/app-home}"
+DEMON_CONTAINER_USER="${DEMON_CONTAINER_USER:-$(id -u):$(id -g)}"
+HOSSCTL_JOB_DIR="${HOSSCTL_JOB_DIR:-$HOME/.hossctl/jobs}"
+DEBUG="${DEMON_DEBUG:-0}"
+
+# Parse command and flags
+COMMAND=""
+JSON_STREAM=false
+NO_WAIT=false
+RETRIES=0
+BACKOFF="exponential"
+TIMEOUT="5m"
+TOPOLOGIES=()
+
+show_help() {
+  cat <<EOF
+hossctl v${VERSION} - HOSS CLI with streaming support
+
+USAGE:
+  hossctl <command> [flags] [args...]
+
+COMMANDS:
+  validate      Run HOSS validation
+  status        Check status of async job
+  cancel        Cancel running job
+  logs          Stream logs from job
+  version       Show version information
+
+VALIDATE FLAGS:
+  --json-stream    Emit newline-delimited JSON events (SSE integration)
+  --no-wait        Launch async, return job ID immediately
+  --retries N      Retry validation up to N times on transient failures (default: 0)
+  --backoff TYPE   Retry backoff: constant|linear|exponential (default: exponential)
+  --timeout DUR    Max validation time (default: 5m)
+  --debug          Enable debug output
+
+EXAMPLES:
+  # Synchronous validation with streaming JSON
+  hossctl validate --json-stream samples/topology-basic.yaml
+
+  # Asynchronous validation
+  JOB_ID=\$(hossctl validate --no-wait samples/topology-complex.yaml)
+  hossctl status \$JOB_ID
+  hossctl logs \$JOB_ID
+
+  # Validation with retry
+  hossctl validate --retries 3 --backoff exponential samples/topology-basic.yaml
+
+DEMON SSE EVENTS:
+  hossctl --json-stream connects to Demon's SSE endpoint and emits:
+  - status: Job status updates (queued, running, completed, failed)
+  - envelope: Result envelope when validation completes
+  - heartbeat: Periodic keepalive events
+
+EXIT CODES:
+  0   Validation passed (status: ok)
+  1   Validation failed (status: error)
+  2   Tool error (demonctl failure, SSE connection error)
+  3   Usage error (invalid flags, missing arguments)
+  4   Job not found (for status/logs/cancel commands)
+
+EOF
+}
+
+# Emit JSON event (RFC 0003 format)
+emit_event() {
+  local event_type="$1"
+  shift
+  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%S.%3NZ")
+
+  case "$event_type" in
+    started)
+      local job_id="$1"
+      shift
+      local topologies_json=$(printf '%s\n' "$@" | jq -R . | jq -s .)
+      jq -cn \
+        --arg event "started" \
+        --arg timestamp "$timestamp" \
+        --arg job_id "$job_id" \
+        --argjson topologies "$topologies_json" \
+        '{event: $event, timestamp: $timestamp, jobId: $job_id, topologies: $topologies}'
+      ;;
+
+    progress)
+      local message="$1"
+      jq -cn \
+        --arg event "progress" \
+        --arg timestamp "$timestamp" \
+        --arg message "$message" \
+        '{event: $event, timestamp: $timestamp, message: $message}'
+      ;;
+
+    status)
+      # Demon SSE status event
+      local job_status="$1"
+      local job_id="${2:-unknown}"
+      jq -cn \
+        --arg event "status" \
+        --arg timestamp "$timestamp" \
+        --arg status "$job_status" \
+        --arg job_id "$job_id" \
+        '{event: $event, timestamp: $timestamp, status: $status, jobId: $job_id}'
+      ;;
+
+    envelope)
+      # Demon SSE envelope event (validation result)
+      local envelope_json="$1"
+      jq -cn \
+        --arg event "envelope" \
+        --arg timestamp "$timestamp" \
+        --argjson envelope "$envelope_json" \
+        '{event: $event, timestamp: $timestamp, envelope: $envelope}'
+      ;;
+
+    heartbeat)
+      # Demon SSE heartbeat event
+      jq -cn \
+        --arg event "heartbeat" \
+        --arg timestamp "$timestamp" \
+        '{event: $event, timestamp: $timestamp}'
+      ;;
+
+    completed)
+      local status="$1"
+      local result_json="${2:-{}}"
+      jq -cn \
+        --arg event "completed" \
+        --arg timestamp "$timestamp" \
+        --arg status "$status" \
+        --argjson result "$result_json" \
+        '{event: $event, timestamp: $timestamp, status: $status, result: $result}'
+      ;;
+
+    failed)
+      local error="$1"
+      local exit_code="${2:-2}"
+      jq -cn \
+        --arg event "failed" \
+        --arg timestamp "$timestamp" \
+        --arg error "$error" \
+        --argjson exit_code "$exit_code" \
+        '{event: $event, timestamp: $timestamp, error: $error, exitCode: $exit_code}'
+      ;;
+
+    retrying)
+      local attempt="$1"
+      local max_attempts="$2"
+      local backoff_ms="$3"
+      jq -cn \
+        --arg event "retrying" \
+        --arg timestamp "$timestamp" \
+        --argjson attempt "$attempt" \
+        --argjson max_attempts "$max_attempts" \
+        --argjson backoff_ms "$backoff_ms" \
+        '{event: $event, timestamp: $timestamp, attempt: $attempt, maxAttempts: $max_attempts, backoffMs: $backoff_ms}'
+      ;;
+  esac
+}
+
+# Parse SSE event stream from Demon
+parse_sse_stream() {
+  local event_type=""
+  local event_data=""
+
+  while IFS= read -r line; do
+    # SSE format: "event: <type>" and "data: <json>"
+    if [[ "$line" =~ ^event:\ (.+)$ ]]; then
+      event_type="${BASH_REMATCH[1]}"
+    elif [[ "$line" =~ ^data:\ (.+)$ ]]; then
+      event_data="${BASH_REMATCH[1]}"
+    elif [[ -z "$line" ]]; then
+      # Empty line signals end of event
+      if [[ -n "$event_type" && -n "$event_data" ]]; then
+        case "$event_type" in
+          status)
+            # Extract status from data
+            job_status=$(echo "$event_data" | jq -r '.status // "unknown"')
+            job_id=$(echo "$event_data" | jq -r '.jobId // "unknown"')
+            emit_event status "$job_status" "$job_id"
+            ;;
+
+          envelope)
+            # Emit result envelope
+            emit_event envelope "$event_data"
+
+            # Extract final status for exit code
+            final_status=$(echo "$event_data" | jq -r '.result.data.status // "error"')
+            if [[ "$final_status" == "ok" ]]; then
+              exit 0
+            else
+              exit 1
+            fi
+            ;;
+
+          heartbeat)
+            emit_event heartbeat
+            ;;
+
+          error)
+            error_msg=$(echo "$event_data" | jq -r '.message // "Unknown error"')
+            emit_event failed "$error_msg" 2
+            exit 2
+            ;;
+        esac
+      fi
+
+      # Reset for next event
+      event_type=""
+      event_data=""
+    fi
+  done
+}
+
+# Run validation with demonctl
+run_validation() {
+  local topologies=("$@")
+
+  # Set Demon env vars
+  export DEMON_APP_HOME
+  export DEMON_CONTAINER_USER
+  [[ "$DEBUG" != "0" ]] && export DEMON_DEBUG=1
+
+  # Build matrix string (newline-separated)
+  local matrix=""
+  for topo in "${topologies[@]}"; do
+    matrix+="$topo"$'\n'
+  done
+
+  # Run demonctl with SSE streaming if supported
+  set +e
+  if command -v demonctl >/dev/null 2>&1; then
+    # Check if demonctl supports --stream flag (Demon Wave F)
+    if demonctl run --help 2>&1 | grep -q "\-\-stream"; then
+      # Use SSE streaming
+      HHFAB_MATRIX="$matrix" demonctl run --stream hoss:hoss-validate 2>&1 | parse_sse_stream
+      return ${PIPESTATUS[0]}
+    else
+      # Fall back to synchronous mode
+      HHFAB_MATRIX="$matrix" demonctl run hoss:hoss-validate 2>&1
+      return $?
+    fi
+  else
+    echo "ERROR: demonctl not found" >&2
+    return 2
+  fi
+  set -e
+}
+
+# Command: validate
+cmd_validate() {
+  local topologies=("$@")
+
+  if [[ ${#topologies[@]} -eq 0 ]]; then
+    echo "ERROR: No topologies specified" >&2
+    echo "Usage: hossctl validate [--json-stream] <topology>..." >&2
+    exit 3
+  fi
+
+  # Generate job ID
+  local job_id="$(date +%Y%m%d-%H%M%S)-$(head -c 8 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 6)"
+
+  # Create job directory for metadata
+  if [[ "$NO_WAIT" == "true" ]]; then
+    mkdir -p "$HOSSCTL_JOB_DIR/$job_id"
+    echo "$job_id" > "$HOSSCTL_JOB_DIR/$job_id/job-id"
+    printf '%s\n' "${topologies[@]}" > "$HOSSCTL_JOB_DIR/$job_id/topologies.txt"
+  fi
+
+  # Emit started event if JSON streaming enabled
+  if [[ "$JSON_STREAM" == "true" ]]; then
+    emit_event started "$job_id" "${topologies[@]}"
+  fi
+
+  # Run validation with retry logic
+  for attempt in $(seq 0 "$RETRIES"); do
+    if [[ "$JSON_STREAM" == "true" ]]; then
+      # Stream mode: run validation and parse SSE
+      if run_validation "${topologies[@]}"; then
+        exit 0
+      else
+        exit_code=$?
+
+        # Check if transient failure
+        if [[ $attempt -lt $RETRIES ]] && is_transient_failure "$exit_code"; then
+          backoff_ms=$(calculate_backoff "$attempt" "$BACKOFF")
+          emit_event retrying "$((attempt + 1))" "$RETRIES" "$backoff_ms"
+          sleep "$(echo "scale=3; $backoff_ms / 1000" | bc)"
+        else
+          emit_event failed "Validation failed with exit code $exit_code" "$exit_code"
+          exit "$exit_code"
+        fi
+      fi
+    else
+      # Non-stream mode: run validation normally
+      if run_validation "${topologies[@]}"; then
+        echo "✅ Validation passed"
+        exit 0
+      else
+        exit_code=$?
+        echo "❌ Validation failed with exit code $exit_code" >&2
+        exit "$exit_code"
+      fi
+    fi
+  done
+}
+
+# Check if failure is transient (container startup, network issues)
+is_transient_failure() {
+  local exit_code="$1"
+  # Exit codes 125-127 are container/runtime failures
+  [[ $exit_code -ge 125 && $exit_code -le 127 ]] || [[ $exit_code -eq 2 ]]
+}
+
+# Calculate backoff delay in milliseconds
+calculate_backoff() {
+  local attempt="$1"
+  local strategy="$2"
+  local base_ms=2000
+
+  case "$strategy" in
+    constant)
+      echo "$base_ms"
+      ;;
+    linear)
+      echo $((base_ms * (attempt + 1)))
+      ;;
+    exponential)
+      local multiplier=$((2 ** attempt))
+      local delay=$((base_ms * multiplier))
+      # Cap at 60 seconds
+      if [[ $delay -gt 60000 ]]; then
+        delay=60000
+      fi
+      echo "$delay"
+      ;;
+    *)
+      echo "$base_ms"
+      ;;
+  esac
+}
+
+# Command: status
+cmd_status() {
+  local job_id="$1"
+
+  if [[ -z "$job_id" ]]; then
+    echo "ERROR: Job ID required" >&2
+    echo "Usage: hossctl status <job-id>" >&2
+    exit 3
+  fi
+
+  local job_dir="$HOSSCTL_JOB_DIR/$job_id"
+
+  if [[ ! -d "$job_dir" ]]; then
+    echo "ERROR: Job not found: $job_id" >&2
+    exit 4
+  fi
+
+  # Check if job is still running
+  if [[ -f "$job_dir/pid" ]]; then
+    local pid=$(cat "$job_dir/pid")
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "Status: running"
+      echo "Job ID: $job_id"
+      echo "PID: $pid"
+      exit 0
+    fi
+  fi
+
+  # Check for result
+  if [[ -f "$job_dir/result.json" ]]; then
+    cat "$job_dir/result.json"
+    exit 0
+  fi
+
+  echo "Status: unknown"
+  echo "Job ID: $job_id"
+  exit 0
+}
+
+# Command: cancel
+cmd_cancel() {
+  local job_id="$1"
+
+  if [[ -z "$job_id" ]]; then
+    echo "ERROR: Job ID required" >&2
+    echo "Usage: hossctl cancel <job-id>" >&2
+    exit 3
+  fi
+
+  local job_dir="$HOSSCTL_JOB_DIR/$job_id"
+
+  if [[ ! -d "$job_dir" ]]; then
+    echo "ERROR: Job not found: $job_id" >&2
+    exit 4
+  fi
+
+  # Send SIGTERM to job process
+  if [[ -f "$job_dir/pid" ]]; then
+    local pid=$(cat "$job_dir/pid")
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -TERM "$pid"
+      echo "Cancelled job: $job_id (PID: $pid)"
+      exit 0
+    fi
+  fi
+
+  echo "Job $job_id is not running"
+  exit 0
+}
+
+# Command: logs
+cmd_logs() {
+  local job_id="$1"
+
+  if [[ -z "$job_id" ]]; then
+    echo "ERROR: Job ID required" >&2
+    echo "Usage: hossctl logs <job-id>" >&2
+    exit 3
+  fi
+
+  local job_dir="$HOSSCTL_JOB_DIR/$job_id"
+
+  if [[ ! -d "$job_dir" ]]; then
+    echo "ERROR: Job not found: $job_id" >&2
+    exit 4
+  fi
+
+  if [[ -f "$job_dir/logs.txt" ]]; then
+    cat "$job_dir/logs.txt"
+  else
+    echo "No logs available for job: $job_id"
+  fi
+
+  exit 0
+}
+
+# Command: version
+cmd_version() {
+  echo "hossctl version $VERSION"
+  if command -v demonctl >/dev/null 2>&1; then
+    demonctl --version 2>/dev/null || echo "demonctl: version unknown"
+  else
+    echo "demonctl: not installed"
+  fi
+  exit 0
+}
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    validate|status|cancel|logs|version)
+      COMMAND="$1"
+      shift
+      ;;
+    --json-stream)
+      JSON_STREAM=true
+      shift
+      ;;
+    --no-wait)
+      NO_WAIT=true
+      shift
+      ;;
+    --retries)
+      RETRIES="$2"
+      shift 2
+      ;;
+    --backoff)
+      BACKOFF="$2"
+      shift 2
+      ;;
+    --timeout)
+      TIMEOUT="$2"
+      shift 2
+      ;;
+    --debug)
+      DEBUG=1
+      shift
+      ;;
+    --help|-h)
+      show_help
+      exit 0
+      ;;
+    *)
+      # Assume topology path
+      TOPOLOGIES+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Dispatch to command
+case "$COMMAND" in
+  validate)
+    cmd_validate "${TOPOLOGIES[@]}"
+    ;;
+  status)
+    cmd_status "${TOPOLOGIES[0]:-}"
+    ;;
+  cancel)
+    cmd_cancel "${TOPOLOGIES[0]:-}"
+    ;;
+  logs)
+    cmd_logs "${TOPOLOGIES[0]:-}"
+    ;;
+  version)
+    cmd_version
+    ;;
+  "")
+    echo "ERROR: No command specified" >&2
+    echo "Run 'hossctl --help' for usage" >&2
+    exit 3
+    ;;
+  *)
+    echo "ERROR: Unknown command: $COMMAND" >&2
+    exit 3
+    ;;
+esac
