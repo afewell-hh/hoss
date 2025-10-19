@@ -29,11 +29,8 @@ jobs:
         with:
           cosign-release: 'v2.2.4'
 
-      - name: Login to GHCR (optional)
-        if: env.GHCR_TOKEN != ''
-        env:
-          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
-        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Collect current digests
         run: |

@@ -69,7 +69,7 @@ jobs:
           echo "Matrix file found, sample count: $(grep -c -v -e '^#' -e '^$' .github/review-kit/matrix.txt || echo 0)"
 
       - name: Login to GHCR
-        run: echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "afewell-hh" --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Verify HHFAB_IMAGE_DIGEST
         run: |
