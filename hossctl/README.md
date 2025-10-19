@@ -79,6 +79,64 @@ hossctl validate --json samples/topology-min.yaml
 
 # Start validation without waiting
 hossctl validate --no-wait samples/topology-min.yaml
+
+# With automatic retry and exponential backoff
+hossctl validate --retries 3 --backoff exponential samples/topology-min.yaml
+
+# With linear backoff strategy
+hossctl validate --retries 3 --backoff linear --backoff-base 5s samples/topology-min.yaml
+
+# With custom backoff parameters
+hossctl validate --retries 5 --backoff exponential --backoff-base 1s --backoff-multiplier 2.5 --backoff-max 30s samples/topology-min.yaml
+```
+
+### Retry and Backoff
+
+`hossctl` supports automatic retry with configurable backoff strategies for transient failures. This is useful for handling network glitches, temporary API unavailability, or container startup issues.
+
+**Flags:**
+- `--retries N` - Maximum number of retry attempts (default: 0, no retries)
+- `--backoff [exponential|linear|constant]` - Backoff strategy (default: exponential)
+- `--backoff-base DURATION` - Base delay for backoff (default: 2s)
+- `--backoff-multiplier FLOAT` - Multiplier for exponential backoff (default: 2.0)
+- `--backoff-max DURATION` - Maximum delay cap (default: 60s)
+
+**Retriable errors:**
+- Network errors (connection refused, timeout, DNS failures)
+- HTTP 5xx errors (502, 503, 504)
+- Container startup failures
+- Stream connection errors
+
+**Non-retriable errors (will NOT retry):**
+- Validation failures (topology errors)
+- HTTP 4xx errors (bad request, unauthorized, forbidden)
+- Invalid input errors
+
+**Backoff strategies:**
+
+1. **Exponential** (default): `delay = min(base × multiplier^attempt, max)`
+   - Example (base=2s, multiplier=2): 2s, 4s, 8s, 16s, 32s, 60s (capped)
+
+2. **Linear**: `delay = min(base × (attempt + 1), max)`
+   - Example (base=2s): 2s, 4s, 6s, 8s, 10s
+
+3. **Constant**: `delay = base` (always the same delay)
+   - Example (base=5s): 5s, 5s, 5s, 5s
+
+**Examples:**
+
+```bash
+# Retry up to 3 times with exponential backoff (2s, 4s, 8s)
+hossctl validate --retries 3 samples/topology-min.yaml
+
+# Retry with linear backoff
+hossctl validate --retries 3 --backoff linear --backoff-base 3s samples/topology-min.yaml
+
+# Retry with constant backoff
+hossctl validate --retries 3 --backoff constant --backoff-base 5s samples/topology-min.yaml
+
+# CI/CD: retry on transient failures
+hossctl validate --retries 3 --backoff exponential --backoff-max 30s --json topology.yaml > result.json
 ```
 
 ### Output
