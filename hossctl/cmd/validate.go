@@ -15,6 +15,7 @@ var (
 	strictMode     bool
 	fabConfigPath  string
 	waitForResults bool
+	useStreaming   bool
 	timeout        time.Duration
 )
 
@@ -48,6 +49,7 @@ func init() {
 	validateCmd.Flags().BoolVar(&strictMode, "strict", false, "Enable strict validation (zero warnings allowed)")
 	validateCmd.Flags().StringVar(&fabConfigPath, "fab-config", "", "Path to fab.yaml configuration file")
 	validateCmd.Flags().BoolVar(&waitForResults, "wait", true, "Wait for validation to complete")
+	validateCmd.Flags().BoolVar(&useStreaming, "stream", false, "Use SSE streaming for real-time progress updates")
 	validateCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for validation")
 }
 
@@ -104,23 +106,66 @@ func runValidate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Wait for completion
-	if !outputJSON {
-		fmt.Fprintf(os.Stderr, "Waiting for results...\n")
+	// Wait for completion (with or without streaming)
+	var envelope map[string]interface{}
+
+	if useStreaming {
+		// Use SSE streaming for real-time updates
+		if !outputJSON {
+			fmt.Fprintf(os.Stderr, "Streaming validation progress...\n")
+		}
+
+		envelope, err = demonClient.StreamRitual(runID, timeout, func(event client.SSEEvent) error {
+			// Emit JSON events if in JSON mode
+			if outputJSON {
+				eventJSON, err := json.Marshal(map[string]interface{}{
+					"event":     event.Type,
+					"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
+					"data":      event.Data,
+				})
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(eventJSON))
+			} else {
+				// Human-readable progress updates
+				switch event.Type {
+				case "status":
+					if status, ok := event.Data["status"].(string); ok {
+						fmt.Fprintf(os.Stderr, "Status: %s\n", status)
+					}
+				case "envelope":
+					fmt.Fprintf(os.Stderr, "Received results\n")
+				case "heartbeat":
+					// Silently ignore heartbeats in human mode
+				}
+			}
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("streaming validation failed: %w", err)
+		}
+	} else {
+		// Use polling (legacy mode)
+		if !outputJSON {
+			fmt.Fprintf(os.Stderr, "Waiting for results...\n")
+		}
+
+		envelope, err = demonClient.WaitForRitual(runID, timeout)
+		if err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
 	}
 
-	envelope, err := demonClient.WaitForRitual(runID, timeout)
-	if err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+	// Output final envelope (unless already emitted via streaming)
+	if !useStreaming || !outputJSON {
+		envelopeJSON, err := json.MarshalIndent(envelope, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal envelope: %w", err)
+		}
+		fmt.Println(string(envelopeJSON))
 	}
-
-	// Output envelope
-	envelopeJSON, err := json.MarshalIndent(envelope, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal envelope: %w", err)
-	}
-
-	fmt.Println(string(envelopeJSON))
 
 	// Check validation status
 	status, ok := envelope["status"].(string)

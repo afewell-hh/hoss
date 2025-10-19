@@ -65,6 +65,12 @@ hossctl validate samples/topology-min.yaml
 # Strict mode (zero warnings allowed)
 hossctl validate --strict samples/topology-min.yaml
 
+# With real-time streaming progress (SSE)
+hossctl validate --stream samples/topology-min.yaml
+
+# Streaming with JSON output
+hossctl validate --stream --json samples/topology-min.yaml
+
 # With custom fab.yaml
 hossctl validate --fab-config hhfab-env/fab.yaml samples/topology-min.yaml
 
@@ -95,6 +101,14 @@ hossctl validate --no-wait samples/topology-min.yaml
   "matrix": ["samples/topology-min.yaml"],
   "errors": []
 }
+```
+
+**Streaming output (--stream --json):**
+```json
+{"event":"status","timestamp":"2025-10-19T18:30:01.234Z","data":{"status":"queued","jobId":"run-abc123"}}
+{"event":"status","timestamp":"2025-10-19T18:30:02.456Z","data":{"status":"running","jobId":"run-abc123"}}
+{"event":"envelope","timestamp":"2025-10-19T18:30:15.789Z","data":{"result":{"success":true,"data":{"status":"ok","counts":{"validated":1,"warnings":0,"failures":0}}}}}
+{"event":"status","timestamp":"2025-10-19T18:30:16.012Z","data":{"status":"completed","jobId":"run-abc123"}}
 ```
 
 **Exit codes:**
