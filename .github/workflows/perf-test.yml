@@ -1,0 +1,305 @@
+name: Performance Testing
+run-name: "perf-test @ ${{ github.sha }}"
+
+on:
+  schedule:
+    # Run nightly at 04:00 UTC (after nightly review-kit)
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      topology_tier:
+        description: 'Topology tier to test (all runs all tiers)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - medium
+          - large
+          - xl
+
+permissions:
+  contents: read
+  packages: read
+  issues: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  HHFAB_IMAGE_DIGEST: ${{ vars.HHFAB_IMAGE_DIGEST }}
+  ARTIFACT_DIR: .artifacts/perf-test
+
+jobs:
+  perf-test:
+    name: perf-test (${{ matrix.tier }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tier: ${{ github.event.inputs.topology_tier == 'all' && fromJSON('["medium", "large", "xl"]') || fromJSON(format('["{0}"]', github.event.inputs.topology_tier || 'medium')) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Diagnose HHFAB_IMAGE_DIGEST presence
+        run: |
+          if [ -n "${HHFAB_IMAGE_DIGEST:-}" ]; then
+            echo "HHFAB_IMAGE_DIGEST is set (length: ${#HHFAB_IMAGE_DIGEST})"
+          else
+            echo "HHFAB_IMAGE_DIGEST is MISSING"; exit 2
+          fi
+
+      - name: Guard HHFAB_IMAGE_DIGEST is digest-pinned
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ ! "${HHFAB_IMAGE_DIGEST:-}" =~ @sha256:[0-9a-f]{64}$ ]]; then
+            echo "HHFAB_IMAGE_DIGEST must be digest-pinned (@sha256:...)" >&2
+            exit 3
+          fi
+
+      - name: Create artifact directory
+        run: mkdir -p "${ARTIFACT_DIR}"
+
+      - name: Verify topology exists
+        run: |
+          TOPOLOGY="samples/perf/topology-${{ matrix.tier }}.yaml"
+          if [[ ! -f "$TOPOLOGY" ]]; then
+            echo "ERROR: Topology file not found: $TOPOLOGY" >&2
+            exit 1
+          fi
+          echo "Topology file: $TOPOLOGY ($(wc -l < "$TOPOLOGY") lines, $(wc -c < "$TOPOLOGY") bytes)"
+
+      - name: Run validation with profiling
+        id: validate
+        run: |
+          set -Eeuo pipefail
+
+          # Record start time
+          START_TIME=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+
+          # Set topology for validation
+          export HHFAB_MATRIX="samples/perf/topology-${{ matrix.tier }}.yaml"
+
+          # Run validation with time profiling
+          /usr/bin/time -v docker run --rm \
+            --network=none \
+            --read-only \
+            --tmpfs /tmp:rw \
+            --memory 2g \
+            --cpus 2 \
+            --security-opt=no-new-privileges \
+            --user "$(id -u):$(id -g)" \
+            -e TMPDIR=/tmp \
+            -e HHFAB_CACHE_DIR=/tmp/.hhfab-cache \
+            -e HHFAB_MATRIX="$HHFAB_MATRIX" \
+            -e STRICT=true \
+            -v "$PWD:/workspace:ro" \
+            -v "$PWD/${ARTIFACT_DIR}:/workspace/${ARTIFACT_DIR}" \
+            -w /workspace \
+            "$HHFAB_IMAGE_DIGEST" \
+            'scripts/hhfab-validate.sh' \
+            2>&1 | tee "${ARTIFACT_DIR}/perf-${{ matrix.tier }}.log"
+
+          VALIDATION_EXIT=$?
+
+          # Record end time
+          END_TIME=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+          VALIDATION_TIME=$((END_TIME - START_TIME))
+
+          echo "validation_time_ms=$VALIDATION_TIME" >> "$GITHUB_OUTPUT"
+          echo "validation_exit=$VALIDATION_EXIT" >> "$GITHUB_OUTPUT"
+
+      - name: Extract memory metrics
+        id: metrics
+        run: |
+          set -Eeuo pipefail
+
+          # Extract peak memory from /usr/bin/time output
+          PEAK_MEMORY_KB=$(grep "Maximum resident set size" "${ARTIFACT_DIR}/perf-${{ matrix.tier }}.log" | awk '{print $NF}')
+
+          if [[ -z "$PEAK_MEMORY_KB" ]]; then
+            echo "WARNING: Could not extract peak memory, using 0" >&2
+            PEAK_MEMORY_KB=0
+          fi
+
+          echo "peak_memory_kb=$PEAK_MEMORY_KB" >> "$GITHUB_OUTPUT"
+
+      - name: Build performance report
+        run: |
+          set -Eeuo pipefail
+
+          VALIDATION_TIME="${{ steps.validate.outputs.validation_time_ms }}"
+          PEAK_MEMORY="${{ steps.metrics.outputs.peak_memory_kb }}"
+          VALIDATION_EXIT="${{ steps.validate.outputs.validation_exit }}"
+
+          # Get validation status from summary.json if available
+          VALIDATION_STATUS="unknown"
+          if [[ -f "${ARTIFACT_DIR}/review-kit/summary.json" ]]; then
+            VALIDATION_STATUS=$(jq -r '.status // "unknown"' "${ARTIFACT_DIR}/review-kit/summary.json")
+          fi
+
+          # Build performance result JSON
+          jq -n \
+            --arg tier "${{ matrix.tier }}" \
+            --arg topology "samples/perf/topology-${{ matrix.tier }}.yaml" \
+            --argjson time "$VALIDATION_TIME" \
+            --argjson memory "$PEAK_MEMORY" \
+            --argjson exit_code "$VALIDATION_EXIT" \
+            --arg status "$VALIDATION_STATUS" \
+            --arg timestamp "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" \
+            --arg image "$HHFAB_IMAGE_DIGEST" \
+            '{
+              tier: $tier,
+              topology: $topology,
+              validationTimeMs: $time,
+              peakMemoryKB: $memory,
+              validationStatus: $status,
+              validationExitCode: $exit_code,
+              timestamp: $timestamp,
+              image: $image
+            }' > "${ARTIFACT_DIR}/perf-${{ matrix.tier }}-result.json"
+
+          echo "Performance result:"
+          jq -C '.' "${ARTIFACT_DIR}/perf-${{ matrix.tier }}-result.json"
+
+      - name: Check thresholds
+        id: threshold_check
+        continue-on-error: ${{ matrix.tier == 'xl' }}
+        run: |
+          set -Eeuo pipefail
+
+          python3 scripts/check-perf-thresholds.py \
+            --thresholds docs/performance-thresholds.json \
+            --result "${ARTIFACT_DIR}/perf-${{ matrix.tier }}-result.json" \
+            --tier "${{ matrix.tier }}"
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        with:
+          name: perf-report-${{ matrix.tier }}-${{ github.run_id }}
+          path: |
+            ${{ env.ARTIFACT_DIR }}/perf-${{ matrix.tier }}-result.json
+            ${{ env.ARTIFACT_DIR }}/perf-${{ matrix.tier }}.log
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Post results to summary
+        if: always()
+        run: |
+          set -Eeuo pipefail
+
+          RESULT_FILE="${ARTIFACT_DIR}/perf-${{ matrix.tier }}-result.json"
+
+          if [[ ! -f "$RESULT_FILE" ]]; then
+            echo "⚠️ Performance result file not found" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Extract metrics
+          TIER=$(jq -r '.tier' "$RESULT_FILE")
+          TIME_MS=$(jq -r '.validationTimeMs' "$RESULT_FILE")
+          TIME_S=$(jq -r '(.validationTimeMs / 1000 | tostring) + "s"' "$RESULT_FILE")
+          MEMORY_MB=$(jq -r '(.peakMemoryKB / 1024 | floor | tostring) + "MB"' "$RESULT_FILE")
+          STATUS=$(jq -r '.validationStatus' "$RESULT_FILE")
+
+          # Get thresholds
+          THRESHOLD_TIME_MS=$(jq -r ".thresholds.$TIER.maxTimeMs" docs/performance-thresholds.json)
+          THRESHOLD_MEMORY_MB=$(jq -r ".thresholds.$TIER.maxMemoryMB" docs/performance-thresholds.json)
+
+          # Determine pass/fail icons
+          if [[ "$TIME_MS" -le "$THRESHOLD_TIME_MS" ]]; then
+            TIME_ICON="✅"
+          else
+            TIME_ICON="❌"
+          fi
+
+          MEMORY_KB=$(jq -r '.peakMemoryKB' "$RESULT_FILE")
+          MEMORY_MB_NUM=$((MEMORY_KB / 1024))
+          if [[ "$MEMORY_MB_NUM" -le "$THRESHOLD_MEMORY_MB" ]]; then
+            MEMORY_ICON="✅"
+          else
+            MEMORY_ICON="❌"
+          fi
+
+          {
+            echo "## Performance Test Results: $TIER tier"
+            echo ""
+            echo "| Metric | Actual | Threshold | Status |"
+            echo "| ------ | ------ | --------- | ------ |"
+            echo "| Validation Time | $TIME_S | ${THRESHOLD_TIME_MS}ms | $TIME_ICON |"
+            echo "| Peak Memory | $MEMORY_MB | ${THRESHOLD_MEMORY_MB}MB | $MEMORY_ICON |"
+            echo "| Validation Status | $STATUS | - | - |"
+            echo ""
+            echo "<details><summary>Full Result JSON</summary>"
+            echo ""
+            echo '```json'
+            jq '.' "$RESULT_FILE"
+            echo '```'
+            echo ""
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create issue on nightly failure
+        if: failure() && github.event_name == 'schedule' && matrix.tier != 'xl'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TIER: ${{ matrix.tier }}
+        with:
+          script: |
+            const runUrl = process.env.RUN_URL;
+            const tier = process.env.TIER;
+
+            // Check if issue already exists for this tier
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: `ci-failure,perf-test,tier-${tier}`,
+              state: 'open'
+            });
+
+            const body = `## Performance Test Failed (Nightly)\n\n` +
+              `**Tier:** ${tier}\n` +
+              `**Run:** ${runUrl}\n` +
+              `**Branch:** \`${context.ref}\`\n` +
+              `**Commit:** \`${context.sha}\`\n\n` +
+              `### Action Required\n` +
+              `1. Review the [workflow run logs](${runUrl})\n` +
+              `2. Check performance report artifact for detailed metrics\n` +
+              `3. Common causes:\n` +
+              `   - Performance regression in validation code\n` +
+              `   - hhfab version change with different performance characteristics\n` +
+              `   - Resource contention on CI runners\n\n` +
+              `See the [Performance Tuning Runbook](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/main/docs/runbooks/performance-tuning.md) for triage procedures.\n\n` +
+              `---\n` +
+              `*Auto-generated by nightly performance test failure*`;
+
+            if (issues.data.length > 0) {
+              // Append to existing issue
+              const issue = issues.data[0];
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: "---\n" + body
+              });
+              console.log("Updated issue #" + issue.number);
+            } else {
+              // Create new issue
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🔴 Performance test failed (nightly) - ${tier} tier`,
+                body: body,
+                labels: ['ci-failure', 'perf-test', `tier-${tier}`, 'needs-triage']
+              });
+              console.log("Created issue #" + newIssue.data.number);
+            }

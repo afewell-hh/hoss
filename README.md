@@ -191,6 +191,40 @@ Digest-pinned, network-isolated, read-only container validation with comprehensi
 - `--user "$(id -u):$(id -g)"` (non-root)
 - tmpfs for `/tmp` only
 
+## Performance Testing
+
+HOSS includes automated performance testing to detect regressions and establish scaling characteristics. Performance tests run nightly and measure validation time and memory usage across multiple topology sizes.
+
+**Quick start:**
+```bash
+# Test medium tier (20 switches)
+hossctl validate samples/perf/topology-medium.yaml
+
+# Profile validation performance
+/usr/bin/time -v hossctl validate samples/perf/topology-large.yaml 2>&1 | tee perf.log
+```
+
+### Performance Tiers
+
+| Tier | Switches | Links | VPCs | Target Time | Target Memory | Purpose |
+|------|----------|-------|------|-------------|---------------|---------|
+| Medium | 20 | 50 | 2 | <5s | <200MB | Small enterprise |
+| Large | 100 | 300 | 10 | <30s | <500MB | Large enterprise |
+| XL | 500 | 1500 | 50 | <120s | <1GB | Stress test |
+
+**Nightly Testing:**
+- Runs at 04:00 UTC via [perf-test workflow](.github/workflows/perf-test.yml)
+- Tests all tiers with digest-pinned hhfab container
+- Compares against thresholds (10% time tolerance, 20% memory tolerance)
+- Creates GitHub issue on regression (medium/large tiers only)
+- Retains performance reports for 90 days
+
+**Resources:**
+- [Performance Test Topologies](samples/perf/) - Sample topologies for benchmarking
+- [Performance Tuning Runbook](docs/runbooks/performance-tuning.md) - Profiling and troubleshooting guide
+- [Performance Thresholds](docs/performance-thresholds.json) - Threshold configuration
+- [RFC 0004: Performance Hardening](docs/rfcs/0004-performance-hardening.md) - Design and implementation details
+
 ## Contributing
 
 1. Add sample files to `.github/review-kit/matrix.txt`

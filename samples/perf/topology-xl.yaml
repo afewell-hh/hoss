@@ -1,0 +1,2914 @@
+# Generated topology: xl tier
+# Switches: 500, Links: 1500, VPCs: 50
+# Generated: 2025-10-19T18:10:32Z
+# trigger strict
+
+apiVersion: wiring.githedgehog.com/v1beta1
+kind: Fabric
+metadata:
+  name: perf-test-xl
+  namespace: default
+spec:
+  switches:
+    - name: switch-0001
+      role: leaf
+      asn: 65001
+      ip: 10.0.0.0
+    - name: switch-0002
+      role: leaf
+      asn: 65002
+      ip: 10.0.0.1
+    - name: switch-0003
+      role: leaf
+      asn: 65003
+      ip: 10.0.0.2
+    - name: switch-0004
+      role: leaf
+      asn: 65004
+      ip: 10.0.0.3
+    - name: switch-0005
+      role: leaf
+      asn: 65005
+      ip: 10.0.0.4
+    - name: switch-0006
+      role: leaf
+      asn: 65006
+      ip: 10.0.0.5
+    - name: switch-0007
+      role: leaf
+      asn: 65007
+      ip: 10.0.0.6
+    - name: switch-0008
+      role: leaf
+      asn: 65008
+      ip: 10.0.0.7
+    - name: switch-0009
+      role: leaf
+      asn: 65009
+      ip: 10.0.0.8
+    - name: switch-0010
+      role: spine
+      asn: 65010
+      ip: 10.0.0.9
+    - name: switch-0011
+      role: leaf
+      asn: 65011
+      ip: 10.0.0.10
+    - name: switch-0012
+      role: leaf
+      asn: 65012
+      ip: 10.0.0.11
+    - name: switch-0013
+      role: leaf
+      asn: 65013
+      ip: 10.0.0.12
+    - name: switch-0014
+      role: leaf
+      asn: 65014
+      ip: 10.0.0.13
+    - name: switch-0015
+      role: leaf
+      asn: 65015
+      ip: 10.0.0.14
+    - name: switch-0016
+      role: leaf
+      asn: 65016
+      ip: 10.0.0.15
+    - name: switch-0017
+      role: leaf
+      asn: 65017
+      ip: 10.0.0.16
+    - name: switch-0018
+      role: leaf
+      asn: 65018
+      ip: 10.0.0.17
+    - name: switch-0019
+      role: leaf
+      asn: 65019
+      ip: 10.0.0.18
+    - name: switch-0020
+      role: spine
+      asn: 65020
+      ip: 10.0.0.19
+    - name: switch-0021
+      role: leaf
+      asn: 65021
+      ip: 10.0.0.20
+    - name: switch-0022
+      role: leaf
+      asn: 65022
+      ip: 10.0.0.21
+    - name: switch-0023
+      role: leaf
+      asn: 65023
+      ip: 10.0.0.22
+    - name: switch-0024
+      role: leaf
+      asn: 65024
+      ip: 10.0.0.23
+    - name: switch-0025
+      role: leaf
+      asn: 65025
+      ip: 10.0.0.24
+    - name: switch-0026
+      role: leaf
+      asn: 65026
+      ip: 10.0.0.25
+    - name: switch-0027
+      role: leaf
+      asn: 65027
+      ip: 10.0.0.26
+    - name: switch-0028
+      role: leaf
+      asn: 65028
+      ip: 10.0.0.27
+    - name: switch-0029
+      role: leaf
+      asn: 65029
+      ip: 10.0.0.28
+    - name: switch-0030
+      role: spine
+      asn: 65030
+      ip: 10.0.0.29
+    - name: switch-0031
+      role: leaf
+      asn: 65031
+      ip: 10.0.0.30
+    - name: switch-0032
+      role: leaf
+      asn: 65032
+      ip: 10.0.0.31
+    - name: switch-0033
+      role: leaf
+      asn: 65033
+      ip: 10.0.0.32
+    - name: switch-0034
+      role: leaf
+      asn: 65034
+      ip: 10.0.0.33
+    - name: switch-0035
+      role: leaf
+      asn: 65035
+      ip: 10.0.0.34
+    - name: switch-0036
+      role: leaf
+      asn: 65036
+      ip: 10.0.0.35
+    - name: switch-0037
+      role: leaf
+      asn: 65037
+      ip: 10.0.0.36
+    - name: switch-0038
+      role: leaf
+      asn: 65038
+      ip: 10.0.0.37
+    - name: switch-0039
+      role: leaf
+      asn: 65039
+      ip: 10.0.0.38
+    - name: switch-0040
+      role: spine
+      asn: 65040
+      ip: 10.0.0.39
+    - name: switch-0041
+      role: leaf
+      asn: 65041
+      ip: 10.0.0.40
+    - name: switch-0042
+      role: leaf
+      asn: 65042
+      ip: 10.0.0.41
+    - name: switch-0043
+      role: leaf
+      asn: 65043
+      ip: 10.0.0.42
+    - name: switch-0044
+      role: leaf
+      asn: 65044
+      ip: 10.0.0.43
+    - name: switch-0045
+      role: leaf
+      asn: 65045
+      ip: 10.0.0.44
+    - name: switch-0046
+      role: leaf
+      asn: 65046
+      ip: 10.0.0.45
+    - name: switch-0047
+      role: leaf
+      asn: 65047
+      ip: 10.0.0.46
+    - name: switch-0048
+      role: leaf
+      asn: 65048
+      ip: 10.0.0.47
+    - name: switch-0049
+      role: leaf
+      asn: 65049
+      ip: 10.0.0.48
+    - name: switch-0050
+      role: spine
+      asn: 65050
+      ip: 10.0.0.49
+    - name: switch-0051
+      role: leaf
+      asn: 65051
+      ip: 10.0.0.50
+    - name: switch-0052
+      role: leaf
+      asn: 65052
+      ip: 10.0.0.51
+    - name: switch-0053
+      role: leaf
+      asn: 65053
+      ip: 10.0.0.52
+    - name: switch-0054
+      role: leaf
+      asn: 65054
+      ip: 10.0.0.53
+    - name: switch-0055
+      role: leaf
+      asn: 65055
+      ip: 10.0.0.54
+    - name: switch-0056
+      role: leaf
+      asn: 65056
+      ip: 10.0.0.55
+    - name: switch-0057
+      role: leaf
+      asn: 65057
+      ip: 10.0.0.56
+    - name: switch-0058
+      role: leaf
+      asn: 65058
+      ip: 10.0.0.57
+    - name: switch-0059
+      role: leaf
+      asn: 65059
+      ip: 10.0.0.58
+    - name: switch-0060
+      role: spine
+      asn: 65060
+      ip: 10.0.0.59
+    - name: switch-0061
+      role: leaf
+      asn: 65061
+      ip: 10.0.0.60
+    - name: switch-0062
+      role: leaf
+      asn: 65062
+      ip: 10.0.0.61
+    - name: switch-0063
+      role: leaf
+      asn: 65063
+      ip: 10.0.0.62
+    - name: switch-0064
+      role: leaf
+      asn: 65064
+      ip: 10.0.0.63
+    - name: switch-0065
+      role: leaf
+      asn: 65065
+      ip: 10.0.0.64
+    - name: switch-0066
+      role: leaf
+      asn: 65066
+      ip: 10.0.0.65
+    - name: switch-0067
+      role: leaf
+      asn: 65067
+      ip: 10.0.0.66
+    - name: switch-0068
+      role: leaf
+      asn: 65068
+      ip: 10.0.0.67
+    - name: switch-0069
+      role: leaf
+      asn: 65069
+      ip: 10.0.0.68
+    - name: switch-0070
+      role: spine
+      asn: 65070
+      ip: 10.0.0.69
+    - name: switch-0071
+      role: leaf
+      asn: 65071
+      ip: 10.0.0.70
+    - name: switch-0072
+      role: leaf
+      asn: 65072
+      ip: 10.0.0.71
+    - name: switch-0073
+      role: leaf
+      asn: 65073
+      ip: 10.0.0.72
+    - name: switch-0074
+      role: leaf
+      asn: 65074
+      ip: 10.0.0.73
+    - name: switch-0075
+      role: leaf
+      asn: 65075
+      ip: 10.0.0.74
+    - name: switch-0076
+      role: leaf
+      asn: 65076
+      ip: 10.0.0.75
+    - name: switch-0077
+      role: leaf
+      asn: 65077
+      ip: 10.0.0.76
+    - name: switch-0078
+      role: leaf
+      asn: 65078
+      ip: 10.0.0.77
+    - name: switch-0079
+      role: leaf
+      asn: 65079
+      ip: 10.0.0.78
+    - name: switch-0080
+      role: spine
+      asn: 65080
+      ip: 10.0.0.79
+    - name: switch-0081
+      role: leaf
+      asn: 65081
+      ip: 10.0.0.80
+    - name: switch-0082
+      role: leaf
+      asn: 65082
+      ip: 10.0.0.81
+    - name: switch-0083
+      role: leaf
+      asn: 65083
+      ip: 10.0.0.82
+    - name: switch-0084
+      role: leaf
+      asn: 65084
+      ip: 10.0.0.83
+    - name: switch-0085
+      role: leaf
+      asn: 65085
+      ip: 10.0.0.84
+    - name: switch-0086
+      role: leaf
+      asn: 65086
+      ip: 10.0.0.85
+    - name: switch-0087
+      role: leaf
+      asn: 65087
+      ip: 10.0.0.86
+    - name: switch-0088
+      role: leaf
+      asn: 65088
+      ip: 10.0.0.87
+    - name: switch-0089
+      role: leaf
+      asn: 65089
+      ip: 10.0.0.88
+    - name: switch-0090
+      role: spine
+      asn: 65090
+      ip: 10.0.0.89
+    - name: switch-0091
+      role: leaf
+      asn: 65091
+      ip: 10.0.0.90
+    - name: switch-0092
+      role: leaf
+      asn: 65092
+      ip: 10.0.0.91
+    - name: switch-0093
+      role: leaf
+      asn: 65093
+      ip: 10.0.0.92
+    - name: switch-0094
+      role: leaf
+      asn: 65094
+      ip: 10.0.0.93
+    - name: switch-0095
+      role: leaf
+      asn: 65095
+      ip: 10.0.0.94
+    - name: switch-0096
+      role: leaf
+      asn: 65096
+      ip: 10.0.0.95
+    - name: switch-0097
+      role: leaf
+      asn: 65097
+      ip: 10.0.0.96
+    - name: switch-0098
+      role: leaf
+      asn: 65098
+      ip: 10.0.0.97
+    - name: switch-0099
+      role: leaf
+      asn: 65099
+      ip: 10.0.0.98
+    - name: switch-0100
+      role: spine
+      asn: 65100
+      ip: 10.0.0.99
+    - name: switch-0101
+      role: leaf
+      asn: 65101
+      ip: 10.0.0.100
+    - name: switch-0102
+      role: leaf
+      asn: 65102
+      ip: 10.0.0.101
+    - name: switch-0103
+      role: leaf
+      asn: 65103
+      ip: 10.0.0.102
+    - name: switch-0104
+      role: leaf
+      asn: 65104
+      ip: 10.0.0.103
+    - name: switch-0105
+      role: leaf
+      asn: 65105
+      ip: 10.0.0.104
+    - name: switch-0106
+      role: leaf
+      asn: 65106
+      ip: 10.0.0.105
+    - name: switch-0107
+      role: leaf
+      asn: 65107
+      ip: 10.0.0.106
+    - name: switch-0108
+      role: leaf
+      asn: 65108
+      ip: 10.0.0.107
+    - name: switch-0109
+      role: leaf
+      asn: 65109
+      ip: 10.0.0.108
+    - name: switch-0110
+      role: spine
+      asn: 65110
+      ip: 10.0.0.109
+    - name: switch-0111
+      role: leaf
+      asn: 65111
+      ip: 10.0.0.110
+    - name: switch-0112
+      role: leaf
+      asn: 65112
+      ip: 10.0.0.111
+    - name: switch-0113
+      role: leaf
+      asn: 65113
+      ip: 10.0.0.112
+    - name: switch-0114
+      role: leaf
+      asn: 65114
+      ip: 10.0.0.113
+    - name: switch-0115
+      role: leaf
+      asn: 65115
+      ip: 10.0.0.114
+    - name: switch-0116
+      role: leaf
+      asn: 65116
+      ip: 10.0.0.115
+    - name: switch-0117
+      role: leaf
+      asn: 65117
+      ip: 10.0.0.116
+    - name: switch-0118
+      role: leaf
+      asn: 65118
+      ip: 10.0.0.117
+    - name: switch-0119
+      role: leaf
+      asn: 65119
+      ip: 10.0.0.118
+    - name: switch-0120
+      role: spine
+      asn: 65120
+      ip: 10.0.0.119
+    - name: switch-0121
+      role: leaf
+      asn: 65121
+      ip: 10.0.0.120
+    - name: switch-0122
+      role: leaf
+      asn: 65122
+      ip: 10.0.0.121
+    - name: switch-0123
+      role: leaf
+      asn: 65123
+      ip: 10.0.0.122
+    - name: switch-0124
+      role: leaf
+      asn: 65124
+      ip: 10.0.0.123
+    - name: switch-0125
+      role: leaf
+      asn: 65125
+      ip: 10.0.0.124
+    - name: switch-0126
+      role: leaf
+      asn: 65126
+      ip: 10.0.0.125
+    - name: switch-0127
+      role: leaf
+      asn: 65127
+      ip: 10.0.0.126
+    - name: switch-0128
+      role: leaf
+      asn: 65128
+      ip: 10.0.0.127
+    - name: switch-0129
+      role: leaf
+      asn: 65129
+      ip: 10.0.0.128
+    - name: switch-0130
+      role: spine
+      asn: 65130
+      ip: 10.0.0.129
+    - name: switch-0131
+      role: leaf
+      asn: 65131
+      ip: 10.0.0.130
+    - name: switch-0132
+      role: leaf
+      asn: 65132
+      ip: 10.0.0.131
+    - name: switch-0133
+      role: leaf
+      asn: 65133
+      ip: 10.0.0.132
+    - name: switch-0134
+      role: leaf
+      asn: 65134
+      ip: 10.0.0.133
+    - name: switch-0135
+      role: leaf
+      asn: 65135
+      ip: 10.0.0.134
+    - name: switch-0136
+      role: leaf
+      asn: 65136
+      ip: 10.0.0.135
+    - name: switch-0137
+      role: leaf
+      asn: 65137
+      ip: 10.0.0.136
+    - name: switch-0138
+      role: leaf
+      asn: 65138
+      ip: 10.0.0.137
+    - name: switch-0139
+      role: leaf
+      asn: 65139
+      ip: 10.0.0.138
+    - name: switch-0140
+      role: spine
+      asn: 65140
+      ip: 10.0.0.139
+    - name: switch-0141
+      role: leaf
+      asn: 65141
+      ip: 10.0.0.140
+    - name: switch-0142
+      role: leaf
+      asn: 65142
+      ip: 10.0.0.141
+    - name: switch-0143
+      role: leaf
+      asn: 65143
+      ip: 10.0.0.142
+    - name: switch-0144
+      role: leaf
+      asn: 65144
+      ip: 10.0.0.143
+    - name: switch-0145
+      role: leaf
+      asn: 65145
+      ip: 10.0.0.144
+    - name: switch-0146
+      role: leaf
+      asn: 65146
+      ip: 10.0.0.145
+    - name: switch-0147
+      role: leaf
+      asn: 65147
+      ip: 10.0.0.146
+    - name: switch-0148
+      role: leaf
+      asn: 65148
+      ip: 10.0.0.147
+    - name: switch-0149
+      role: leaf
+      asn: 65149
+      ip: 10.0.0.148
+    - name: switch-0150
+      role: spine
+      asn: 65150
+      ip: 10.0.0.149
+    - name: switch-0151
+      role: leaf
+      asn: 65151
+      ip: 10.0.0.150
+    - name: switch-0152
+      role: leaf
+      asn: 65152
+      ip: 10.0.0.151
+    - name: switch-0153
+      role: leaf
+      asn: 65153
+      ip: 10.0.0.152
+    - name: switch-0154
+      role: leaf
+      asn: 65154
+      ip: 10.0.0.153
+    - name: switch-0155
+      role: leaf
+      asn: 65155
+      ip: 10.0.0.154
+    - name: switch-0156
+      role: leaf
+      asn: 65156
+      ip: 10.0.0.155
+    - name: switch-0157
+      role: leaf
+      asn: 65157
+      ip: 10.0.0.156
+    - name: switch-0158
+      role: leaf
+      asn: 65158
+      ip: 10.0.0.157
+    - name: switch-0159
+      role: leaf
+      asn: 65159
+      ip: 10.0.0.158
+    - name: switch-0160
+      role: spine
+      asn: 65160
+      ip: 10.0.0.159
+    - name: switch-0161
+      role: leaf
+      asn: 65161
+      ip: 10.0.0.160
+    - name: switch-0162
+      role: leaf
+      asn: 65162
+      ip: 10.0.0.161
+    - name: switch-0163
+      role: leaf
+      asn: 65163
+      ip: 10.0.0.162
+    - name: switch-0164
+      role: leaf
+      asn: 65164
+      ip: 10.0.0.163
+    - name: switch-0165
+      role: leaf
+      asn: 65165
+      ip: 10.0.0.164
+    - name: switch-0166
+      role: leaf
+      asn: 65166
+      ip: 10.0.0.165
+    - name: switch-0167
+      role: leaf
+      asn: 65167
+      ip: 10.0.0.166
+    - name: switch-0168
+      role: leaf
+      asn: 65168
+      ip: 10.0.0.167
+    - name: switch-0169
+      role: leaf
+      asn: 65169
+      ip: 10.0.0.168
+    - name: switch-0170
+      role: spine
+      asn: 65170
+      ip: 10.0.0.169
+    - name: switch-0171
+      role: leaf
+      asn: 65171
+      ip: 10.0.0.170
+    - name: switch-0172
+      role: leaf
+      asn: 65172
+      ip: 10.0.0.171
+    - name: switch-0173
+      role: leaf
+      asn: 65173
+      ip: 10.0.0.172
+    - name: switch-0174
+      role: leaf
+      asn: 65174
+      ip: 10.0.0.173
+    - name: switch-0175
+      role: leaf
+      asn: 65175
+      ip: 10.0.0.174
+    - name: switch-0176
+      role: leaf
+      asn: 65176
+      ip: 10.0.0.175
+    - name: switch-0177
+      role: leaf
+      asn: 65177
+      ip: 10.0.0.176
+    - name: switch-0178
+      role: leaf
+      asn: 65178
+      ip: 10.0.0.177
+    - name: switch-0179
+      role: leaf
+      asn: 65179
+      ip: 10.0.0.178
+    - name: switch-0180
+      role: spine
+      asn: 65180
+      ip: 10.0.0.179
+    - name: switch-0181
+      role: leaf
+      asn: 65181
+      ip: 10.0.0.180
+    - name: switch-0182
+      role: leaf
+      asn: 65182
+      ip: 10.0.0.181
+    - name: switch-0183
+      role: leaf
+      asn: 65183
+      ip: 10.0.0.182
+    - name: switch-0184
+      role: leaf
+      asn: 65184
+      ip: 10.0.0.183
+    - name: switch-0185
+      role: leaf
+      asn: 65185
+      ip: 10.0.0.184
+    - name: switch-0186
+      role: leaf
+      asn: 65186
+      ip: 10.0.0.185
+    - name: switch-0187
+      role: leaf
+      asn: 65187
+      ip: 10.0.0.186
+    - name: switch-0188
+      role: leaf
+      asn: 65188
+      ip: 10.0.0.187
+    - name: switch-0189
+      role: leaf
+      asn: 65189
+      ip: 10.0.0.188
+    - name: switch-0190
+      role: spine
+      asn: 65190
+      ip: 10.0.0.189
+    - name: switch-0191
+      role: leaf
+      asn: 65191
+      ip: 10.0.0.190
+    - name: switch-0192
+      role: leaf
+      asn: 65192
+      ip: 10.0.0.191
+    - name: switch-0193
+      role: leaf
+      asn: 65193
+      ip: 10.0.0.192
+    - name: switch-0194
+      role: leaf
+      asn: 65194
+      ip: 10.0.0.193
+    - name: switch-0195
+      role: leaf
+      asn: 65195
+      ip: 10.0.0.194
+    - name: switch-0196
+      role: leaf
+      asn: 65196
+      ip: 10.0.0.195
+    - name: switch-0197
+      role: leaf
+      asn: 65197
+      ip: 10.0.0.196
+    - name: switch-0198
+      role: leaf
+      asn: 65198
+      ip: 10.0.0.197
+    - name: switch-0199
+      role: leaf
+      asn: 65199
+      ip: 10.0.0.198
+    - name: switch-0200
+      role: spine
+      asn: 65200
+      ip: 10.0.0.199
+    - name: switch-0201
+      role: leaf
+      asn: 65201
+      ip: 10.0.0.200
+    - name: switch-0202
+      role: leaf
+      asn: 65202
+      ip: 10.0.0.201
+    - name: switch-0203
+      role: leaf
+      asn: 65203
+      ip: 10.0.0.202
+    - name: switch-0204
+      role: leaf
+      asn: 65204
+      ip: 10.0.0.203
+    - name: switch-0205
+      role: leaf
+      asn: 65205
+      ip: 10.0.0.204
+    - name: switch-0206
+      role: leaf
+      asn: 65206
+      ip: 10.0.0.205
+    - name: switch-0207
+      role: leaf
+      asn: 65207
+      ip: 10.0.0.206
+    - name: switch-0208
+      role: leaf
+      asn: 65208
+      ip: 10.0.0.207
+    - name: switch-0209
+      role: leaf
+      asn: 65209
+      ip: 10.0.0.208
+    - name: switch-0210
+      role: spine
+      asn: 65210
+      ip: 10.0.0.209
+    - name: switch-0211
+      role: leaf
+      asn: 65211
+      ip: 10.0.0.210
+    - name: switch-0212
+      role: leaf
+      asn: 65212
+      ip: 10.0.0.211
+    - name: switch-0213
+      role: leaf
+      asn: 65213
+      ip: 10.0.0.212
+    - name: switch-0214
+      role: leaf
+      asn: 65214
+      ip: 10.0.0.213
+    - name: switch-0215
+      role: leaf
+      asn: 65215
+      ip: 10.0.0.214
+    - name: switch-0216
+      role: leaf
+      asn: 65216
+      ip: 10.0.0.215
+    - name: switch-0217
+      role: leaf
+      asn: 65217
+      ip: 10.0.0.216
+    - name: switch-0218
+      role: leaf
+      asn: 65218
+      ip: 10.0.0.217
+    - name: switch-0219
+      role: leaf
+      asn: 65219
+      ip: 10.0.0.218
+    - name: switch-0220
+      role: spine
+      asn: 65220
+      ip: 10.0.0.219
+    - name: switch-0221
+      role: leaf
+      asn: 65221
+      ip: 10.0.0.220
+    - name: switch-0222
+      role: leaf
+      asn: 65222
+      ip: 10.0.0.221
+    - name: switch-0223
+      role: leaf
+      asn: 65223
+      ip: 10.0.0.222
+    - name: switch-0224
+      role: leaf
+      asn: 65224
+      ip: 10.0.0.223
+    - name: switch-0225
+      role: leaf
+      asn: 65225
+      ip: 10.0.0.224
+    - name: switch-0226
+      role: leaf
+      asn: 65226
+      ip: 10.0.0.225
+    - name: switch-0227
+      role: leaf
+      asn: 65227
+      ip: 10.0.0.226
+    - name: switch-0228
+      role: leaf
+      asn: 65228
+      ip: 10.0.0.227
+    - name: switch-0229
+      role: leaf
+      asn: 65229
+      ip: 10.0.0.228
+    - name: switch-0230
+      role: spine
+      asn: 65230
+      ip: 10.0.0.229
+    - name: switch-0231
+      role: leaf
+      asn: 65231
+      ip: 10.0.0.230
+    - name: switch-0232
+      role: leaf
+      asn: 65232
+      ip: 10.0.0.231
+    - name: switch-0233
+      role: leaf
+      asn: 65233
+      ip: 10.0.0.232
+    - name: switch-0234
+      role: leaf
+      asn: 65234
+      ip: 10.0.0.233
+    - name: switch-0235
+      role: leaf
+      asn: 65235
+      ip: 10.0.0.234
+    - name: switch-0236
+      role: leaf
+      asn: 65236
+      ip: 10.0.0.235
+    - name: switch-0237
+      role: leaf
+      asn: 65237
+      ip: 10.0.0.236
+    - name: switch-0238
+      role: leaf
+      asn: 65238
+      ip: 10.0.0.237
+    - name: switch-0239
+      role: leaf
+      asn: 65239
+      ip: 10.0.0.238
+    - name: switch-0240
+      role: spine
+      asn: 65240
+      ip: 10.0.0.239
+    - name: switch-0241
+      role: leaf
+      asn: 65241
+      ip: 10.0.0.240
+    - name: switch-0242
+      role: leaf
+      asn: 65242
+      ip: 10.0.0.241
+    - name: switch-0243
+      role: leaf
+      asn: 65243
+      ip: 10.0.0.242
+    - name: switch-0244
+      role: leaf
+      asn: 65244
+      ip: 10.0.0.243
+    - name: switch-0245
+      role: leaf
+      asn: 65245
+      ip: 10.0.0.244
+    - name: switch-0246
+      role: leaf
+      asn: 65246
+      ip: 10.0.0.245
+    - name: switch-0247
+      role: leaf
+      asn: 65247
+      ip: 10.0.0.246
+    - name: switch-0248
+      role: leaf
+      asn: 65248
+      ip: 10.0.0.247
+    - name: switch-0249
+      role: leaf
+      asn: 65249
+      ip: 10.0.0.248
+    - name: switch-0250
+      role: spine
+      asn: 65250
+      ip: 10.0.0.249
+    - name: switch-0251
+      role: leaf
+      asn: 65251
+      ip: 10.0.0.250
+    - name: switch-0252
+      role: leaf
+      asn: 65252
+      ip: 10.0.0.251
+    - name: switch-0253
+      role: leaf
+      asn: 65253
+      ip: 10.0.0.252
+    - name: switch-0254
+      role: leaf
+      asn: 65254
+      ip: 10.0.0.253
+    - name: switch-0255
+      role: leaf
+      asn: 65255
+      ip: 10.0.0.254
+    - name: switch-0256
+      role: leaf
+      asn: 65256
+      ip: 10.0.0.255
+    - name: switch-0257
+      role: leaf
+      asn: 65257
+      ip: 10.0.1.0
+    - name: switch-0258
+      role: leaf
+      asn: 65258
+      ip: 10.0.1.1
+    - name: switch-0259
+      role: leaf
+      asn: 65259
+      ip: 10.0.1.2
+    - name: switch-0260
+      role: spine
+      asn: 65260
+      ip: 10.0.1.3
+    - name: switch-0261
+      role: leaf
+      asn: 65261
+      ip: 10.0.1.4
+    - name: switch-0262
+      role: leaf
+      asn: 65262
+      ip: 10.0.1.5
+    - name: switch-0263
+      role: leaf
+      asn: 65263
+      ip: 10.0.1.6
+    - name: switch-0264
+      role: leaf
+      asn: 65264
+      ip: 10.0.1.7
+    - name: switch-0265
+      role: leaf
+      asn: 65265
+      ip: 10.0.1.8
+    - name: switch-0266
+      role: leaf
+      asn: 65266
+      ip: 10.0.1.9
+    - name: switch-0267
+      role: leaf
+      asn: 65267
+      ip: 10.0.1.10
+    - name: switch-0268
+      role: leaf
+      asn: 65268
+      ip: 10.0.1.11
+    - name: switch-0269
+      role: leaf
+      asn: 65269
+      ip: 10.0.1.12
+    - name: switch-0270
+      role: spine
+      asn: 65270
+      ip: 10.0.1.13
+    - name: switch-0271
+      role: leaf
+      asn: 65271
+      ip: 10.0.1.14
+    - name: switch-0272
+      role: leaf
+      asn: 65272
+      ip: 10.0.1.15
+    - name: switch-0273
+      role: leaf
+      asn: 65273
+      ip: 10.0.1.16
+    - name: switch-0274
+      role: leaf
+      asn: 65274
+      ip: 10.0.1.17
+    - name: switch-0275
+      role: leaf
+      asn: 65275
+      ip: 10.0.1.18
+    - name: switch-0276
+      role: leaf
+      asn: 65276
+      ip: 10.0.1.19
+    - name: switch-0277
+      role: leaf
+      asn: 65277
+      ip: 10.0.1.20
+    - name: switch-0278
+      role: leaf
+      asn: 65278
+      ip: 10.0.1.21
+    - name: switch-0279
+      role: leaf
+      asn: 65279
+      ip: 10.0.1.22
+    - name: switch-0280
+      role: spine
+      asn: 65280
+      ip: 10.0.1.23
+    - name: switch-0281
+      role: leaf
+      asn: 65281
+      ip: 10.0.1.24
+    - name: switch-0282
+      role: leaf
+      asn: 65282
+      ip: 10.0.1.25
+    - name: switch-0283
+      role: leaf
+      asn: 65283
+      ip: 10.0.1.26
+    - name: switch-0284
+      role: leaf
+      asn: 65284
+      ip: 10.0.1.27
+    - name: switch-0285
+      role: leaf
+      asn: 65285
+      ip: 10.0.1.28
+    - name: switch-0286
+      role: leaf
+      asn: 65286
+      ip: 10.0.1.29
+    - name: switch-0287
+      role: leaf
+      asn: 65287
+      ip: 10.0.1.30
+    - name: switch-0288
+      role: leaf
+      asn: 65288
+      ip: 10.0.1.31
+    - name: switch-0289
+      role: leaf
+      asn: 65289
+      ip: 10.0.1.32
+    - name: switch-0290
+      role: spine
+      asn: 65290
+      ip: 10.0.1.33
+    - name: switch-0291
+      role: leaf
+      asn: 65291
+      ip: 10.0.1.34
+    - name: switch-0292
+      role: leaf
+      asn: 65292
+      ip: 10.0.1.35
+    - name: switch-0293
+      role: leaf
+      asn: 65293
+      ip: 10.0.1.36
+    - name: switch-0294
+      role: leaf
+      asn: 65294
+      ip: 10.0.1.37
+    - name: switch-0295
+      role: leaf
+      asn: 65295
+      ip: 10.0.1.38
+    - name: switch-0296
+      role: leaf
+      asn: 65296
+      ip: 10.0.1.39
+    - name: switch-0297
+      role: leaf
+      asn: 65297
+      ip: 10.0.1.40
+    - name: switch-0298
+      role: leaf
+      asn: 65298
+      ip: 10.0.1.41
+    - name: switch-0299
+      role: leaf
+      asn: 65299
+      ip: 10.0.1.42
+    - name: switch-0300
+      role: spine
+      asn: 65300
+      ip: 10.0.1.43
+    - name: switch-0301
+      role: leaf
+      asn: 65301
+      ip: 10.0.1.44
+    - name: switch-0302
+      role: leaf
+      asn: 65302
+      ip: 10.0.1.45
+    - name: switch-0303
+      role: leaf
+      asn: 65303
+      ip: 10.0.1.46
+    - name: switch-0304
+      role: leaf
+      asn: 65304
+      ip: 10.0.1.47
+    - name: switch-0305
+      role: leaf
+      asn: 65305
+      ip: 10.0.1.48
+    - name: switch-0306
+      role: leaf
+      asn: 65306
+      ip: 10.0.1.49
+    - name: switch-0307
+      role: leaf
+      asn: 65307
+      ip: 10.0.1.50
+    - name: switch-0308
+      role: leaf
+      asn: 65308
+      ip: 10.0.1.51
+    - name: switch-0309
+      role: leaf
+      asn: 65309
+      ip: 10.0.1.52
+    - name: switch-0310
+      role: spine
+      asn: 65310
+      ip: 10.0.1.53
+    - name: switch-0311
+      role: leaf
+      asn: 65311
+      ip: 10.0.1.54
+    - name: switch-0312
+      role: leaf
+      asn: 65312
+      ip: 10.0.1.55
+    - name: switch-0313
+      role: leaf
+      asn: 65313
+      ip: 10.0.1.56
+    - name: switch-0314
+      role: leaf
+      asn: 65314
+      ip: 10.0.1.57
+    - name: switch-0315
+      role: leaf
+      asn: 65315
+      ip: 10.0.1.58
+    - name: switch-0316
+      role: leaf
+      asn: 65316
+      ip: 10.0.1.59
+    - name: switch-0317
+      role: leaf
+      asn: 65317
+      ip: 10.0.1.60
+    - name: switch-0318
+      role: leaf
+      asn: 65318
+      ip: 10.0.1.61
+    - name: switch-0319
+      role: leaf
+      asn: 65319
+      ip: 10.0.1.62
+    - name: switch-0320
+      role: spine
+      asn: 65320
+      ip: 10.0.1.63
+    - name: switch-0321
+      role: leaf
+      asn: 65321
+      ip: 10.0.1.64
+    - name: switch-0322
+      role: leaf
+      asn: 65322
+      ip: 10.0.1.65
+    - name: switch-0323
+      role: leaf
+      asn: 65323
+      ip: 10.0.1.66
+    - name: switch-0324
+      role: leaf
+      asn: 65324
+      ip: 10.0.1.67
+    - name: switch-0325
+      role: leaf
+      asn: 65325
+      ip: 10.0.1.68
+    - name: switch-0326
+      role: leaf
+      asn: 65326
+      ip: 10.0.1.69
+    - name: switch-0327
+      role: leaf
+      asn: 65327
+      ip: 10.0.1.70
+    - name: switch-0328
+      role: leaf
+      asn: 65328
+      ip: 10.0.1.71
+    - name: switch-0329
+      role: leaf
+      asn: 65329
+      ip: 10.0.1.72
+    - name: switch-0330
+      role: spine
+      asn: 65330
+      ip: 10.0.1.73
+    - name: switch-0331
+      role: leaf
+      asn: 65331
+      ip: 10.0.1.74
+    - name: switch-0332
+      role: leaf
+      asn: 65332
+      ip: 10.0.1.75
+    - name: switch-0333
+      role: leaf
+      asn: 65333
+      ip: 10.0.1.76
+    - name: switch-0334
+      role: leaf
+      asn: 65334
+      ip: 10.0.1.77
+    - name: switch-0335
+      role: leaf
+      asn: 65335
+      ip: 10.0.1.78
+    - name: switch-0336
+      role: leaf
+      asn: 65336
+      ip: 10.0.1.79
+    - name: switch-0337
+      role: leaf
+      asn: 65337
+      ip: 10.0.1.80
+    - name: switch-0338
+      role: leaf
+      asn: 65338
+      ip: 10.0.1.81
+    - name: switch-0339
+      role: leaf
+      asn: 65339
+      ip: 10.0.1.82
+    - name: switch-0340
+      role: spine
+      asn: 65340
+      ip: 10.0.1.83
+    - name: switch-0341
+      role: leaf
+      asn: 65341
+      ip: 10.0.1.84
+    - name: switch-0342
+      role: leaf
+      asn: 65342
+      ip: 10.0.1.85
+    - name: switch-0343
+      role: leaf
+      asn: 65343
+      ip: 10.0.1.86
+    - name: switch-0344
+      role: leaf
+      asn: 65344
+      ip: 10.0.1.87
+    - name: switch-0345
+      role: leaf
+      asn: 65345
+      ip: 10.0.1.88
+    - name: switch-0346
+      role: leaf
+      asn: 65346
+      ip: 10.0.1.89
+    - name: switch-0347
+      role: leaf
+      asn: 65347
+      ip: 10.0.1.90
+    - name: switch-0348
+      role: leaf
+      asn: 65348
+      ip: 10.0.1.91
+    - name: switch-0349
+      role: leaf
+      asn: 65349
+      ip: 10.0.1.92
+    - name: switch-0350
+      role: spine
+      asn: 65350
+      ip: 10.0.1.93
+    - name: switch-0351
+      role: leaf
+      asn: 65351
+      ip: 10.0.1.94
+    - name: switch-0352
+      role: leaf
+      asn: 65352
+      ip: 10.0.1.95
+    - name: switch-0353
+      role: leaf
+      asn: 65353
+      ip: 10.0.1.96
+    - name: switch-0354
+      role: leaf
+      asn: 65354
+      ip: 10.0.1.97
+    - name: switch-0355
+      role: leaf
+      asn: 65355
+      ip: 10.0.1.98
+    - name: switch-0356
+      role: leaf
+      asn: 65356
+      ip: 10.0.1.99
+    - name: switch-0357
+      role: leaf
+      asn: 65357
+      ip: 10.0.1.100
+    - name: switch-0358
+      role: leaf
+      asn: 65358
+      ip: 10.0.1.101
+    - name: switch-0359
+      role: leaf
+      asn: 65359
+      ip: 10.0.1.102
+    - name: switch-0360
+      role: spine
+      asn: 65360
+      ip: 10.0.1.103
+    - name: switch-0361
+      role: leaf
+      asn: 65361
+      ip: 10.0.1.104
+    - name: switch-0362
+      role: leaf
+      asn: 65362
+      ip: 10.0.1.105
+    - name: switch-0363
+      role: leaf
+      asn: 65363
+      ip: 10.0.1.106
+    - name: switch-0364
+      role: leaf
+      asn: 65364
+      ip: 10.0.1.107
+    - name: switch-0365
+      role: leaf
+      asn: 65365
+      ip: 10.0.1.108
+    - name: switch-0366
+      role: leaf
+      asn: 65366
+      ip: 10.0.1.109
+    - name: switch-0367
+      role: leaf
+      asn: 65367
+      ip: 10.0.1.110
+    - name: switch-0368
+      role: leaf
+      asn: 65368
+      ip: 10.0.1.111
+    - name: switch-0369
+      role: leaf
+      asn: 65369
+      ip: 10.0.1.112
+    - name: switch-0370
+      role: spine
+      asn: 65370
+      ip: 10.0.1.113
+    - name: switch-0371
+      role: leaf
+      asn: 65371
+      ip: 10.0.1.114
+    - name: switch-0372
+      role: leaf
+      asn: 65372
+      ip: 10.0.1.115
+    - name: switch-0373
+      role: leaf
+      asn: 65373
+      ip: 10.0.1.116
+    - name: switch-0374
+      role: leaf
+      asn: 65374
+      ip: 10.0.1.117
+    - name: switch-0375
+      role: leaf
+      asn: 65375
+      ip: 10.0.1.118
+    - name: switch-0376
+      role: leaf
+      asn: 65376
+      ip: 10.0.1.119
+    - name: switch-0377
+      role: leaf
+      asn: 65377
+      ip: 10.0.1.120
+    - name: switch-0378
+      role: leaf
+      asn: 65378
+      ip: 10.0.1.121
+    - name: switch-0379
+      role: leaf
+      asn: 65379
+      ip: 10.0.1.122
+    - name: switch-0380
+      role: spine
+      asn: 65380
+      ip: 10.0.1.123
+    - name: switch-0381
+      role: leaf
+      asn: 65381
+      ip: 10.0.1.124
+    - name: switch-0382
+      role: leaf
+      asn: 65382
+      ip: 10.0.1.125
+    - name: switch-0383
+      role: leaf
+      asn: 65383
+      ip: 10.0.1.126
+    - name: switch-0384
+      role: leaf
+      asn: 65384
+      ip: 10.0.1.127
+    - name: switch-0385
+      role: leaf
+      asn: 65385
+      ip: 10.0.1.128
+    - name: switch-0386
+      role: leaf
+      asn: 65386
+      ip: 10.0.1.129
+    - name: switch-0387
+      role: leaf
+      asn: 65387
+      ip: 10.0.1.130
+    - name: switch-0388
+      role: leaf
+      asn: 65388
+      ip: 10.0.1.131
+    - name: switch-0389
+      role: leaf
+      asn: 65389
+      ip: 10.0.1.132
+    - name: switch-0390
+      role: spine
+      asn: 65390
+      ip: 10.0.1.133
+    - name: switch-0391
+      role: leaf
+      asn: 65391
+      ip: 10.0.1.134
+    - name: switch-0392
+      role: leaf
+      asn: 65392
+      ip: 10.0.1.135
+    - name: switch-0393
+      role: leaf
+      asn: 65393
+      ip: 10.0.1.136
+    - name: switch-0394
+      role: leaf
+      asn: 65394
+      ip: 10.0.1.137
+    - name: switch-0395
+      role: leaf
+      asn: 65395
+      ip: 10.0.1.138
+    - name: switch-0396
+      role: leaf
+      asn: 65396
+      ip: 10.0.1.139
+    - name: switch-0397
+      role: leaf
+      asn: 65397
+      ip: 10.0.1.140
+    - name: switch-0398
+      role: leaf
+      asn: 65398
+      ip: 10.0.1.141
+    - name: switch-0399
+      role: leaf
+      asn: 65399
+      ip: 10.0.1.142
+    - name: switch-0400
+      role: spine
+      asn: 65400
+      ip: 10.0.1.143
+    - name: switch-0401
+      role: leaf
+      asn: 65401
+      ip: 10.0.1.144
+    - name: switch-0402
+      role: leaf
+      asn: 65402
+      ip: 10.0.1.145
+    - name: switch-0403
+      role: leaf
+      asn: 65403
+      ip: 10.0.1.146
+    - name: switch-0404
+      role: leaf
+      asn: 65404
+      ip: 10.0.1.147
+    - name: switch-0405
+      role: leaf
+      asn: 65405
+      ip: 10.0.1.148
+    - name: switch-0406
+      role: leaf
+      asn: 65406
+      ip: 10.0.1.149
+    - name: switch-0407
+      role: leaf
+      asn: 65407
+      ip: 10.0.1.150
+    - name: switch-0408
+      role: leaf
+      asn: 65408
+      ip: 10.0.1.151
+    - name: switch-0409
+      role: leaf
+      asn: 65409
+      ip: 10.0.1.152
+    - name: switch-0410
+      role: spine
+      asn: 65410
+      ip: 10.0.1.153
+    - name: switch-0411
+      role: leaf
+      asn: 65411
+      ip: 10.0.1.154
+    - name: switch-0412
+      role: leaf
+      asn: 65412
+      ip: 10.0.1.155
+    - name: switch-0413
+      role: leaf
+      asn: 65413
+      ip: 10.0.1.156
+    - name: switch-0414
+      role: leaf
+      asn: 65414
+      ip: 10.0.1.157
+    - name: switch-0415
+      role: leaf
+      asn: 65415
+      ip: 10.0.1.158
+    - name: switch-0416
+      role: leaf
+      asn: 65416
+      ip: 10.0.1.159
+    - name: switch-0417
+      role: leaf
+      asn: 65417
+      ip: 10.0.1.160
+    - name: switch-0418
+      role: leaf
+      asn: 65418
+      ip: 10.0.1.161
+    - name: switch-0419
+      role: leaf
+      asn: 65419
+      ip: 10.0.1.162
+    - name: switch-0420
+      role: spine
+      asn: 65420
+      ip: 10.0.1.163
+    - name: switch-0421
+      role: leaf
+      asn: 65421
+      ip: 10.0.1.164
+    - name: switch-0422
+      role: leaf
+      asn: 65422
+      ip: 10.0.1.165
+    - name: switch-0423
+      role: leaf
+      asn: 65423
+      ip: 10.0.1.166
+    - name: switch-0424
+      role: leaf
+      asn: 65424
+      ip: 10.0.1.167
+    - name: switch-0425
+      role: leaf
+      asn: 65425
+      ip: 10.0.1.168
+    - name: switch-0426
+      role: leaf
+      asn: 65426
+      ip: 10.0.1.169
+    - name: switch-0427
+      role: leaf
+      asn: 65427
+      ip: 10.0.1.170
+    - name: switch-0428
+      role: leaf
+      asn: 65428
+      ip: 10.0.1.171
+    - name: switch-0429
+      role: leaf
+      asn: 65429
+      ip: 10.0.1.172
+    - name: switch-0430
+      role: spine
+      asn: 65430
+      ip: 10.0.1.173
+    - name: switch-0431
+      role: leaf
+      asn: 65431
+      ip: 10.0.1.174
+    - name: switch-0432
+      role: leaf
+      asn: 65432
+      ip: 10.0.1.175
+    - name: switch-0433
+      role: leaf
+      asn: 65433
+      ip: 10.0.1.176
+    - name: switch-0434
+      role: leaf
+      asn: 65434
+      ip: 10.0.1.177
+    - name: switch-0435
+      role: leaf
+      asn: 65435
+      ip: 10.0.1.178
+    - name: switch-0436
+      role: leaf
+      asn: 65436
+      ip: 10.0.1.179
+    - name: switch-0437
+      role: leaf
+      asn: 65437
+      ip: 10.0.1.180
+    - name: switch-0438
+      role: leaf
+      asn: 65438
+      ip: 10.0.1.181
+    - name: switch-0439
+      role: leaf
+      asn: 65439
+      ip: 10.0.1.182
+    - name: switch-0440
+      role: spine
+      asn: 65440
+      ip: 10.0.1.183
+    - name: switch-0441
+      role: leaf
+      asn: 65441
+      ip: 10.0.1.184
+    - name: switch-0442
+      role: leaf
+      asn: 65442
+      ip: 10.0.1.185
+    - name: switch-0443
+      role: leaf
+      asn: 65443
+      ip: 10.0.1.186
+    - name: switch-0444
+      role: leaf
+      asn: 65444
+      ip: 10.0.1.187
+    - name: switch-0445
+      role: leaf
+      asn: 65445
+      ip: 10.0.1.188
+    - name: switch-0446
+      role: leaf
+      asn: 65446
+      ip: 10.0.1.189
+    - name: switch-0447
+      role: leaf
+      asn: 65447
+      ip: 10.0.1.190
+    - name: switch-0448
+      role: leaf
+      asn: 65448
+      ip: 10.0.1.191
+    - name: switch-0449
+      role: leaf
+      asn: 65449
+      ip: 10.0.1.192
+    - name: switch-0450
+      role: spine
+      asn: 65450
+      ip: 10.0.1.193
+    - name: switch-0451
+      role: leaf
+      asn: 65451
+      ip: 10.0.1.194
+    - name: switch-0452
+      role: leaf
+      asn: 65452
+      ip: 10.0.1.195
+    - name: switch-0453
+      role: leaf
+      asn: 65453
+      ip: 10.0.1.196
+    - name: switch-0454
+      role: leaf
+      asn: 65454
+      ip: 10.0.1.197
+    - name: switch-0455
+      role: leaf
+      asn: 65455
+      ip: 10.0.1.198
+    - name: switch-0456
+      role: leaf
+      asn: 65456
+      ip: 10.0.1.199
+    - name: switch-0457
+      role: leaf
+      asn: 65457
+      ip: 10.0.1.200
+    - name: switch-0458
+      role: leaf
+      asn: 65458
+      ip: 10.0.1.201
+    - name: switch-0459
+      role: leaf
+      asn: 65459
+      ip: 10.0.1.202
+    - name: switch-0460
+      role: spine
+      asn: 65460
+      ip: 10.0.1.203
+    - name: switch-0461
+      role: leaf
+      asn: 65461
+      ip: 10.0.1.204
+    - name: switch-0462
+      role: leaf
+      asn: 65462
+      ip: 10.0.1.205
+    - name: switch-0463
+      role: leaf
+      asn: 65463
+      ip: 10.0.1.206
+    - name: switch-0464
+      role: leaf
+      asn: 65464
+      ip: 10.0.1.207
+    - name: switch-0465
+      role: leaf
+      asn: 65465
+      ip: 10.0.1.208
+    - name: switch-0466
+      role: leaf
+      asn: 65466
+      ip: 10.0.1.209
+    - name: switch-0467
+      role: leaf
+      asn: 65467
+      ip: 10.0.1.210
+    - name: switch-0468
+      role: leaf
+      asn: 65468
+      ip: 10.0.1.211
+    - name: switch-0469
+      role: leaf
+      asn: 65469
+      ip: 10.0.1.212
+    - name: switch-0470
+      role: spine
+      asn: 65470
+      ip: 10.0.1.213
+    - name: switch-0471
+      role: leaf
+      asn: 65471
+      ip: 10.0.1.214
+    - name: switch-0472
+      role: leaf
+      asn: 65472
+      ip: 10.0.1.215
+    - name: switch-0473
+      role: leaf
+      asn: 65473
+      ip: 10.0.1.216
+    - name: switch-0474
+      role: leaf
+      asn: 65474
+      ip: 10.0.1.217
+    - name: switch-0475
+      role: leaf
+      asn: 65475
+      ip: 10.0.1.218
+    - name: switch-0476
+      role: leaf
+      asn: 65476
+      ip: 10.0.1.219
+    - name: switch-0477
+      role: leaf
+      asn: 65477
+      ip: 10.0.1.220
+    - name: switch-0478
+      role: leaf
+      asn: 65478
+      ip: 10.0.1.221
+    - name: switch-0479
+      role: leaf
+      asn: 65479
+      ip: 10.0.1.222
+    - name: switch-0480
+      role: spine
+      asn: 65480
+      ip: 10.0.1.223
+    - name: switch-0481
+      role: leaf
+      asn: 65481
+      ip: 10.0.1.224
+    - name: switch-0482
+      role: leaf
+      asn: 65482
+      ip: 10.0.1.225
+    - name: switch-0483
+      role: leaf
+      asn: 65483
+      ip: 10.0.1.226
+    - name: switch-0484
+      role: leaf
+      asn: 65484
+      ip: 10.0.1.227
+    - name: switch-0485
+      role: leaf
+      asn: 65485
+      ip: 10.0.1.228
+    - name: switch-0486
+      role: leaf
+      asn: 65486
+      ip: 10.0.1.229
+    - name: switch-0487
+      role: leaf
+      asn: 65487
+      ip: 10.0.1.230
+    - name: switch-0488
+      role: leaf
+      asn: 65488
+      ip: 10.0.1.231
+    - name: switch-0489
+      role: leaf
+      asn: 65489
+      ip: 10.0.1.232
+    - name: switch-0490
+      role: spine
+      asn: 65490
+      ip: 10.0.1.233
+    - name: switch-0491
+      role: leaf
+      asn: 65491
+      ip: 10.0.1.234
+    - name: switch-0492
+      role: leaf
+      asn: 65492
+      ip: 10.0.1.235
+    - name: switch-0493
+      role: leaf
+      asn: 65493
+      ip: 10.0.1.236
+    - name: switch-0494
+      role: leaf
+      asn: 65494
+      ip: 10.0.1.237
+    - name: switch-0495
+      role: leaf
+      asn: 65495
+      ip: 10.0.1.238
+    - name: switch-0496
+      role: leaf
+      asn: 65496
+      ip: 10.0.1.239
+    - name: switch-0497
+      role: leaf
+      asn: 65497
+      ip: 10.0.1.240
+    - name: switch-0498
+      role: leaf
+      asn: 65498
+      ip: 10.0.1.241
+    - name: switch-0499
+      role: leaf
+      asn: 65499
+      ip: 10.0.1.242
+    - name: switch-0500
+      role: spine
+      asn: 65500
+      ip: 10.0.1.243
+  links:
+    - from: switch-0001
+      to: switch-0002
+      port: Ethernet2
+    - from: switch-0003
+      to: switch-0004
+      port: Ethernet3
+    - from: switch-0005
+      to: switch-0006
+      port: Ethernet4
+    - from: switch-0007
+      to: switch-0008
+      port: Ethernet5
+    - from: switch-0009
+      to: switch-0010
+      port: Ethernet6
+    - from: switch-0011
+      to: switch-0012
+      port: Ethernet7
+    - from: switch-0013
+      to: switch-0014
+      port: Ethernet8
+    - from: switch-0015
+      to: switch-0016
+      port: Ethernet9
+    - from: switch-0017
+      to: switch-0018
+      port: Ethernet10
+    - from: switch-0019
+      to: switch-0020
+      port: Ethernet11
+    - from: switch-0021
+      to: switch-0022
+      port: Ethernet12
+    - from: switch-0023
+      to: switch-0024
+      port: Ethernet13
+    - from: switch-0025
+      to: switch-0026
+      port: Ethernet14
+    - from: switch-0027
+      to: switch-0028
+      port: Ethernet15
+    - from: switch-0029
+      to: switch-0030
+      port: Ethernet16
+    - from: switch-0031
+      to: switch-0032
+      port: Ethernet17
+    - from: switch-0033
+      to: switch-0034
+      port: Ethernet18
+    - from: switch-0035
+      to: switch-0036
+      port: Ethernet19
+    - from: switch-0037
+      to: switch-0038
+      port: Ethernet20
+    - from: switch-0039
+      to: switch-0040
+      port: Ethernet21
+    - from: switch-0041
+      to: switch-0042
+      port: Ethernet22
+    - from: switch-0043
+      to: switch-0044
+      port: Ethernet23
+    - from: switch-0045
+      to: switch-0046
+      port: Ethernet24
+    - from: switch-0047
+      to: switch-0048
+      port: Ethernet25
+    - from: switch-0049
+      to: switch-0050
+      port: Ethernet26
+    - from: switch-0051
+      to: switch-0052
+      port: Ethernet27
+    - from: switch-0053
+      to: switch-0054
+      port: Ethernet28
+    - from: switch-0055
+      to: switch-0056
+      port: Ethernet29
+    - from: switch-0057
+      to: switch-0058
+      port: Ethernet30
+    - from: switch-0059
+      to: switch-0060
+      port: Ethernet31
+    - from: switch-0061
+      to: switch-0062
+      port: Ethernet32
+    - from: switch-0063
+      to: switch-0064
+      port: Ethernet33
+    - from: switch-0065
+      to: switch-0066
+      port: Ethernet34
+    - from: switch-0067
+      to: switch-0068
+      port: Ethernet35
+    - from: switch-0069
+      to: switch-0070
+      port: Ethernet36
+    - from: switch-0071
+      to: switch-0072
+      port: Ethernet37
+    - from: switch-0073
+      to: switch-0074
+      port: Ethernet38
+    - from: switch-0075
+      to: switch-0076
+      port: Ethernet39
+    - from: switch-0077
+      to: switch-0078
+      port: Ethernet40
+    - from: switch-0079
+      to: switch-0080
+      port: Ethernet41
+    - from: switch-0081
+      to: switch-0082
+      port: Ethernet42
+    - from: switch-0083
+      to: switch-0084
+      port: Ethernet43
+    - from: switch-0085
+      to: switch-0086
+      port: Ethernet44
+    - from: switch-0087
+      to: switch-0088
+      port: Ethernet45
+    - from: switch-0089
+      to: switch-0090
+      port: Ethernet46
+    - from: switch-0091
+      to: switch-0092
+      port: Ethernet47
+    - from: switch-0093
+      to: switch-0094
+      port: Ethernet48
+    - from: switch-0095
+      to: switch-0096
+      port: Ethernet1
+    - from: switch-0097
+      to: switch-0098
+      port: Ethernet2
+    - from: switch-0099
+      to: switch-0100
+      port: Ethernet3
+    - from: switch-0101
+      to: switch-0102
+      port: Ethernet4
+    - from: switch-0103
+      to: switch-0104
+      port: Ethernet5
+    - from: switch-0105
+      to: switch-0106
+      port: Ethernet6
+    - from: switch-0107
+      to: switch-0108
+      port: Ethernet7
+    - from: switch-0109
+      to: switch-0110
+      port: Ethernet8
+    - from: switch-0111
+      to: switch-0112
+      port: Ethernet9
+    - from: switch-0113
+      to: switch-0114
+      port: Ethernet10
+    - from: switch-0115
+      to: switch-0116
+      port: Ethernet11
+    - from: switch-0117
+      to: switch-0118
+      port: Ethernet12
+    - from: switch-0119
+      to: switch-0120
+      port: Ethernet13
+    - from: switch-0121
+      to: switch-0122
+      port: Ethernet14
+    - from: switch-0123
+      to: switch-0124
+      port: Ethernet15
+    - from: switch-0125
+      to: switch-0126
+      port: Ethernet16
+    - from: switch-0127
+      to: switch-0128
+      port: Ethernet17
+    - from: switch-0129
+      to: switch-0130
+      port: Ethernet18
+    - from: switch-0131
+      to: switch-0132
+      port: Ethernet19
+    - from: switch-0133
+      to: switch-0134
+      port: Ethernet20
+    - from: switch-0135
+      to: switch-0136
+      port: Ethernet21
+    - from: switch-0137
+      to: switch-0138
+      port: Ethernet22
+    - from: switch-0139
+      to: switch-0140
+      port: Ethernet23
+    - from: switch-0141
+      to: switch-0142
+      port: Ethernet24
+    - from: switch-0143
+      to: switch-0144
+      port: Ethernet25
+    - from: switch-0145
+      to: switch-0146
+      port: Ethernet26
+    - from: switch-0147
+      to: switch-0148
+      port: Ethernet27
+    - from: switch-0149
+      to: switch-0150
+      port: Ethernet28
+    - from: switch-0151
+      to: switch-0152
+      port: Ethernet29
+    - from: switch-0153
+      to: switch-0154
+      port: Ethernet30
+    - from: switch-0155
+      to: switch-0156
+      port: Ethernet31
+    - from: switch-0157
+      to: switch-0158
+      port: Ethernet32
+    - from: switch-0159
+      to: switch-0160
+      port: Ethernet33
+    - from: switch-0161
+      to: switch-0162
+      port: Ethernet34
+    - from: switch-0163
+      to: switch-0164
+      port: Ethernet35
+    - from: switch-0165
+      to: switch-0166
+      port: Ethernet36
+    - from: switch-0167
+      to: switch-0168
+      port: Ethernet37
+    - from: switch-0169
+      to: switch-0170
+      port: Ethernet38
+    - from: switch-0171
+      to: switch-0172
+      port: Ethernet39
+    - from: switch-0173
+      to: switch-0174
+      port: Ethernet40
+    - from: switch-0175
+      to: switch-0176
+      port: Ethernet41
+    - from: switch-0177
+      to: switch-0178
+      port: Ethernet42
+    - from: switch-0179
+      to: switch-0180
+      port: Ethernet43
+    - from: switch-0181
+      to: switch-0182
+      port: Ethernet44
+    - from: switch-0183
+      to: switch-0184
+      port: Ethernet45
+    - from: switch-0185
+      to: switch-0186
+      port: Ethernet46
+    - from: switch-0187
+      to: switch-0188
+      port: Ethernet47
+    - from: switch-0189
+      to: switch-0190
+      port: Ethernet48
+    - from: switch-0191
+      to: switch-0192
+      port: Ethernet1
+    - from: switch-0193
+      to: switch-0194
+      port: Ethernet2
+    - from: switch-0195
+      to: switch-0196
+      port: Ethernet3
+    - from: switch-0197
+      to: switch-0198
+      port: Ethernet4
+    - from: switch-0199
+      to: switch-0200
+      port: Ethernet5
+    - from: switch-0201
+      to: switch-0202
+      port: Ethernet6
+    - from: switch-0203
+      to: switch-0204
+      port: Ethernet7
+    - from: switch-0205
+      to: switch-0206
+      port: Ethernet8
+    - from: switch-0207
+      to: switch-0208
+      port: Ethernet9
+    - from: switch-0209
+      to: switch-0210
+      port: Ethernet10
+    - from: switch-0211
+      to: switch-0212
+      port: Ethernet11
+    - from: switch-0213
+      to: switch-0214
+      port: Ethernet12
+    - from: switch-0215
+      to: switch-0216
+      port: Ethernet13
+    - from: switch-0217
+      to: switch-0218
+      port: Ethernet14
+    - from: switch-0219
+      to: switch-0220
+      port: Ethernet15
+    - from: switch-0221
+      to: switch-0222
+      port: Ethernet16
+    - from: switch-0223
+      to: switch-0224
+      port: Ethernet17
+    - from: switch-0225
+      to: switch-0226
+      port: Ethernet18
+    - from: switch-0227
+      to: switch-0228
+      port: Ethernet19
+    - from: switch-0229
+      to: switch-0230
+      port: Ethernet20
+    - from: switch-0231
+      to: switch-0232
+      port: Ethernet21
+    - from: switch-0233
+      to: switch-0234
+      port: Ethernet22
+    - from: switch-0235
+      to: switch-0236
+      port: Ethernet23
+    - from: switch-0237
+      to: switch-0238
+      port: Ethernet24
+    - from: switch-0239
+      to: switch-0240
+      port: Ethernet25
+    - from: switch-0241
+      to: switch-0242
+      port: Ethernet26
+    - from: switch-0243
+      to: switch-0244
+      port: Ethernet27
+    - from: switch-0245
+      to: switch-0246
+      port: Ethernet28
+    - from: switch-0247
+      to: switch-0248
+      port: Ethernet29
+    - from: switch-0249
+      to: switch-0250
+      port: Ethernet30
+    - from: switch-0251
+      to: switch-0252
+      port: Ethernet31
+    - from: switch-0253
+      to: switch-0254
+      port: Ethernet32
+    - from: switch-0255
+      to: switch-0256
+      port: Ethernet33
+    - from: switch-0257
+      to: switch-0258
+      port: Ethernet34
+    - from: switch-0259
+      to: switch-0260
+      port: Ethernet35
+    - from: switch-0261
+      to: switch-0262
+      port: Ethernet36
+    - from: switch-0263
+      to: switch-0264
+      port: Ethernet37
+    - from: switch-0265
+      to: switch-0266
+      port: Ethernet38
+    - from: switch-0267
+      to: switch-0268
+      port: Ethernet39
+    - from: switch-0269
+      to: switch-0270
+      port: Ethernet40
+    - from: switch-0271
+      to: switch-0272
+      port: Ethernet41
+    - from: switch-0273
+      to: switch-0274
+      port: Ethernet42
+    - from: switch-0275
+      to: switch-0276
+      port: Ethernet43
+    - from: switch-0277
+      to: switch-0278
+      port: Ethernet44
+    - from: switch-0279
+      to: switch-0280
+      port: Ethernet45
+    - from: switch-0281
+      to: switch-0282
+      port: Ethernet46
+    - from: switch-0283
+      to: switch-0284
+      port: Ethernet47
+    - from: switch-0285
+      to: switch-0286
+      port: Ethernet48
+    - from: switch-0287
+      to: switch-0288
+      port: Ethernet1
+    - from: switch-0289
+      to: switch-0290
+      port: Ethernet2
+    - from: switch-0291
+      to: switch-0292
+      port: Ethernet3
+    - from: switch-0293
+      to: switch-0294
+      port: Ethernet4
+    - from: switch-0295
+      to: switch-0296
+      port: Ethernet5
+    - from: switch-0297
+      to: switch-0298
+      port: Ethernet6
+    - from: switch-0299
+      to: switch-0300
+      port: Ethernet7
+    - from: switch-0301
+      to: switch-0302
+      port: Ethernet8
+    - from: switch-0303
+      to: switch-0304
+      port: Ethernet9
+    - from: switch-0305
+      to: switch-0306
+      port: Ethernet10
+    - from: switch-0307
+      to: switch-0308
+      port: Ethernet11
+    - from: switch-0309
+      to: switch-0310
+      port: Ethernet12
+    - from: switch-0311
+      to: switch-0312
+      port: Ethernet13
+    - from: switch-0313
+      to: switch-0314
+      port: Ethernet14
+    - from: switch-0315
+      to: switch-0316
+      port: Ethernet15
+    - from: switch-0317
+      to: switch-0318
+      port: Ethernet16
+    - from: switch-0319
+      to: switch-0320
+      port: Ethernet17
+    - from: switch-0321
+      to: switch-0322
+      port: Ethernet18
+    - from: switch-0323
+      to: switch-0324
+      port: Ethernet19
+    - from: switch-0325
+      to: switch-0326
+      port: Ethernet20
+    - from: switch-0327
+      to: switch-0328
+      port: Ethernet21
+    - from: switch-0329
+      to: switch-0330
+      port: Ethernet22
+    - from: switch-0331
+      to: switch-0332
+      port: Ethernet23
+    - from: switch-0333
+      to: switch-0334
+      port: Ethernet24
+    - from: switch-0335
+      to: switch-0336
+      port: Ethernet25
+    - from: switch-0337
+      to: switch-0338
+      port: Ethernet26
+    - from: switch-0339
+      to: switch-0340
+      port: Ethernet27
+    - from: switch-0341
+      to: switch-0342
+      port: Ethernet28
+    - from: switch-0343
+      to: switch-0344
+      port: Ethernet29
+    - from: switch-0345
+      to: switch-0346
+      port: Ethernet30
+    - from: switch-0347
+      to: switch-0348
+      port: Ethernet31
+    - from: switch-0349
+      to: switch-0350
+      port: Ethernet32
+    - from: switch-0351
+      to: switch-0352
+      port: Ethernet33
+    - from: switch-0353
+      to: switch-0354
+      port: Ethernet34
+    - from: switch-0355
+      to: switch-0356
+      port: Ethernet35
+    - from: switch-0357
+      to: switch-0358
+      port: Ethernet36
+    - from: switch-0359
+      to: switch-0360
+      port: Ethernet37
+    - from: switch-0361
+      to: switch-0362
+      port: Ethernet38
+    - from: switch-0363
+      to: switch-0364
+      port: Ethernet39
+    - from: switch-0365
+      to: switch-0366
+      port: Ethernet40
+    - from: switch-0367
+      to: switch-0368
+      port: Ethernet41
+    - from: switch-0369
+      to: switch-0370
+      port: Ethernet42
+    - from: switch-0371
+      to: switch-0372
+      port: Ethernet43
+    - from: switch-0373
+      to: switch-0374
+      port: Ethernet44
+    - from: switch-0375
+      to: switch-0376
+      port: Ethernet45
+    - from: switch-0377
+      to: switch-0378
+      port: Ethernet46
+    - from: switch-0379
+      to: switch-0380
+      port: Ethernet47
+    - from: switch-0381
+      to: switch-0382
+      port: Ethernet48
+    - from: switch-0383
+      to: switch-0384
+      port: Ethernet1
+    - from: switch-0385
+      to: switch-0386
+      port: Ethernet2
+    - from: switch-0387
+      to: switch-0388
+      port: Ethernet3
+    - from: switch-0389
+      to: switch-0390
+      port: Ethernet4
+    - from: switch-0391
+      to: switch-0392
+      port: Ethernet5
+    - from: switch-0393
+      to: switch-0394
+      port: Ethernet6
+    - from: switch-0395
+      to: switch-0396
+      port: Ethernet7
+    - from: switch-0397
+      to: switch-0398
+      port: Ethernet8
+    - from: switch-0399
+      to: switch-0400
+      port: Ethernet9
+    - from: switch-0401
+      to: switch-0402
+      port: Ethernet10
+    - from: switch-0403
+      to: switch-0404
+      port: Ethernet11
+    - from: switch-0405
+      to: switch-0406
+      port: Ethernet12
+    - from: switch-0407
+      to: switch-0408
+      port: Ethernet13
+    - from: switch-0409
+      to: switch-0410
+      port: Ethernet14
+    - from: switch-0411
+      to: switch-0412
+      port: Ethernet15
+    - from: switch-0413
+      to: switch-0414
+      port: Ethernet16
+    - from: switch-0415
+      to: switch-0416
+      port: Ethernet17
+    - from: switch-0417
+      to: switch-0418
+      port: Ethernet18
+    - from: switch-0419
+      to: switch-0420
+      port: Ethernet19
+    - from: switch-0421
+      to: switch-0422
+      port: Ethernet20
+    - from: switch-0423
+      to: switch-0424
+      port: Ethernet21
+    - from: switch-0425
+      to: switch-0426
+      port: Ethernet22
+    - from: switch-0427
+      to: switch-0428
+      port: Ethernet23
+    - from: switch-0429
+      to: switch-0430
+      port: Ethernet24
+    - from: switch-0431
+      to: switch-0432
+      port: Ethernet25
+    - from: switch-0433
+      to: switch-0434
+      port: Ethernet26
+    - from: switch-0435
+      to: switch-0436
+      port: Ethernet27
+    - from: switch-0437
+      to: switch-0438
+      port: Ethernet28
+    - from: switch-0439
+      to: switch-0440
+      port: Ethernet29
+    - from: switch-0441
+      to: switch-0442
+      port: Ethernet30
+    - from: switch-0443
+      to: switch-0444
+      port: Ethernet31
+    - from: switch-0445
+      to: switch-0446
+      port: Ethernet32
+    - from: switch-0447
+      to: switch-0448
+      port: Ethernet33
+    - from: switch-0449
+      to: switch-0450
+      port: Ethernet34
+    - from: switch-0451
+      to: switch-0452
+      port: Ethernet35
+    - from: switch-0453
+      to: switch-0454
+      port: Ethernet36
+    - from: switch-0455
+      to: switch-0456
+      port: Ethernet37
+    - from: switch-0457
+      to: switch-0458
+      port: Ethernet38
+    - from: switch-0459
+      to: switch-0460
+      port: Ethernet39
+    - from: switch-0461
+      to: switch-0462
+      port: Ethernet40
+    - from: switch-0463
+      to: switch-0464
+      port: Ethernet41
+    - from: switch-0465
+      to: switch-0466
+      port: Ethernet42
+    - from: switch-0467
+      to: switch-0468
+      port: Ethernet43
+    - from: switch-0469
+      to: switch-0470
+      port: Ethernet44
+    - from: switch-0471
+      to: switch-0472
+      port: Ethernet45
+    - from: switch-0473
+      to: switch-0474
+      port: Ethernet46
+    - from: switch-0475
+      to: switch-0476
+      port: Ethernet47
+    - from: switch-0477
+      to: switch-0478
+      port: Ethernet48
+    - from: switch-0479
+      to: switch-0480
+      port: Ethernet1
+    - from: switch-0481
+      to: switch-0482
+      port: Ethernet2
+    - from: switch-0483
+      to: switch-0484
+      port: Ethernet3
+    - from: switch-0485
+      to: switch-0486
+      port: Ethernet4
+    - from: switch-0487
+      to: switch-0488
+      port: Ethernet5
+    - from: switch-0489
+      to: switch-0490
+      port: Ethernet6
+    - from: switch-0491
+      to: switch-0492
+      port: Ethernet7
+    - from: switch-0493
+      to: switch-0494
+      port: Ethernet8
+    - from: switch-0495
+      to: switch-0496
+      port: Ethernet9
+    - from: switch-0497
+      to: switch-0498
+      port: Ethernet10
+    - from: switch-0499
+      to: switch-0500
+      port: Ethernet11
+  vpcs:
+    - name: vpc-001
+      vni: 10001
+      subnet: 172.16.0.0/24
+    - name: vpc-002
+      vni: 10002
+      subnet: 172.16.0.0/24
+    - name: vpc-003
+      vni: 10003
+      subnet: 172.16.0.0/24
+    - name: vpc-004
+      vni: 10004
+      subnet: 172.16.0.0/24
+    - name: vpc-005
+      vni: 10005
+      subnet: 172.16.0.0/24
+    - name: vpc-006
+      vni: 10006
+      subnet: 172.16.0.0/24
+    - name: vpc-007
+      vni: 10007
+      subnet: 172.16.0.0/24
+    - name: vpc-008
+      vni: 10008
+      subnet: 172.16.0.0/24
+    - name: vpc-009
+      vni: 10009
+      subnet: 172.16.0.0/24
+    - name: vpc-010
+      vni: 10010
+      subnet: 172.16.0.0/24
+    - name: vpc-011
+      vni: 10011
+      subnet: 172.16.0.0/24
+    - name: vpc-012
+      vni: 10012
+      subnet: 172.16.0.0/24
+    - name: vpc-013
+      vni: 10013
+      subnet: 172.16.0.0/24
+    - name: vpc-014
+      vni: 10014
+      subnet: 172.16.0.0/24
+    - name: vpc-015
+      vni: 10015
+      subnet: 172.16.0.0/24
+    - name: vpc-016
+      vni: 10016
+      subnet: 172.16.0.0/24
+    - name: vpc-017
+      vni: 10017
+      subnet: 172.16.0.0/24
+    - name: vpc-018
+      vni: 10018
+      subnet: 172.16.0.0/24
+    - name: vpc-019
+      vni: 10019
+      subnet: 172.16.0.0/24
+    - name: vpc-020
+      vni: 10020
+      subnet: 172.16.0.0/24
+    - name: vpc-021
+      vni: 10021
+      subnet: 172.16.0.0/24
+    - name: vpc-022
+      vni: 10022
+      subnet: 172.16.0.0/24
+    - name: vpc-023
+      vni: 10023
+      subnet: 172.16.0.0/24
+    - name: vpc-024
+      vni: 10024
+      subnet: 172.16.0.0/24
+    - name: vpc-025
+      vni: 10025
+      subnet: 172.16.0.0/24
+    - name: vpc-026
+      vni: 10026
+      subnet: 172.16.0.0/24
+    - name: vpc-027
+      vni: 10027
+      subnet: 172.16.0.0/24
+    - name: vpc-028
+      vni: 10028
+      subnet: 172.16.0.0/24
+    - name: vpc-029
+      vni: 10029
+      subnet: 172.16.0.0/24
+    - name: vpc-030
+      vni: 10030
+      subnet: 172.16.0.0/24
+    - name: vpc-031
+      vni: 10031
+      subnet: 172.16.0.0/24
+    - name: vpc-032
+      vni: 10032
+      subnet: 172.16.0.0/24
+    - name: vpc-033
+      vni: 10033
+      subnet: 172.16.0.0/24
+    - name: vpc-034
+      vni: 10034
+      subnet: 172.16.0.0/24
+    - name: vpc-035
+      vni: 10035
+      subnet: 172.16.0.0/24
+    - name: vpc-036
+      vni: 10036
+      subnet: 172.16.0.0/24
+    - name: vpc-037
+      vni: 10037
+      subnet: 172.16.0.0/24
+    - name: vpc-038
+      vni: 10038
+      subnet: 172.16.0.0/24
+    - name: vpc-039
+      vni: 10039
+      subnet: 172.16.0.0/24
+    - name: vpc-040
+      vni: 10040
+      subnet: 172.16.0.0/24
+    - name: vpc-041
+      vni: 10041
+      subnet: 172.16.0.0/24
+    - name: vpc-042
+      vni: 10042
+      subnet: 172.16.0.0/24
+    - name: vpc-043
+      vni: 10043
+      subnet: 172.16.0.0/24
+    - name: vpc-044
+      vni: 10044
+      subnet: 172.16.0.0/24
+    - name: vpc-045
+      vni: 10045
+      subnet: 172.16.0.0/24
+    - name: vpc-046
+      vni: 10046
+      subnet: 172.16.0.0/24
+    - name: vpc-047
+      vni: 10047
+      subnet: 172.16.0.0/24
+    - name: vpc-048
+      vni: 10048
+      subnet: 172.16.0.0/24
+    - name: vpc-049
+      vni: 10049
+      subnet: 172.16.0.0/24
+    - name: vpc-050
+      vni: 10050
+      subnet: 172.16.0.0/24
