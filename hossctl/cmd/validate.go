@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/afewell-hh/hoss/hossctl/pkg/client"
+	"github.com/afewell-hh/hoss/hossctl/pkg/jobstore"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,9 @@ Examples:
   # Validate and wait for results
   hossctl validate --wait samples/topology-min.yaml
 
+  # Launch validation asynchronously (no-wait mode)
+  hossctl validate --no-wait samples/topology-large.yaml
+
   # Output JSON only
   hossctl validate --json samples/topology-min.yaml`,
 	Args: cobra.ExactArgs(1),
@@ -56,7 +60,7 @@ func init() {
 
 	validateCmd.Flags().BoolVar(&strictMode, "strict", false, "Enable strict validation (zero warnings allowed)")
 	validateCmd.Flags().StringVar(&fabConfigPath, "fab-config", "", "Path to fab.yaml configuration file")
-	validateCmd.Flags().BoolVar(&waitForResults, "wait", true, "Wait for validation to complete")
+	validateCmd.Flags().BoolVar(&waitForResults, "wait", true, "Wait for validation to complete (use --no-wait for async)")
 	validateCmd.Flags().BoolVar(&useStreaming, "stream", false, "Use SSE streaming for real-time progress updates")
 	validateCmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "Timeout for validation")
 
@@ -231,9 +235,34 @@ func runValidate(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Ritual started: %s\n", runID)
 		}
 
+		// If --no-wait, save job metadata and return job ID
 		if !waitForResults {
-			fmt.Printf(`{"runId":"%s","status":"started"}`, runID)
-			fmt.Println()
+			// Initialize job store
+			store, err := jobstore.NewJobStore("", 100, 7)
+			if err != nil {
+				return fmt.Errorf("failed to initialize job store: %w", err)
+			}
+
+			// Save job metadata
+			job := &jobstore.JobMetadata{
+				JobID:     runID,
+				RunID:     runID,
+				Status:    "pending",
+				Ritual:    "hoss-validate",
+				Input:     request,
+				CreatedAt: time.Now().Format(time.RFC3339),
+				UpdatedAt: time.Now().Format(time.RFC3339),
+			}
+
+			if err := store.SaveJob(job); err != nil {
+				// Log warning but don't fail
+				if !outputJSON {
+					fmt.Fprintf(os.Stderr, "Warning: failed to save job metadata: %v\n", err)
+				}
+			}
+
+			// Return job ID (just the ID, not JSON object)
+			fmt.Println(runID)
 			return nil
 		}
 
