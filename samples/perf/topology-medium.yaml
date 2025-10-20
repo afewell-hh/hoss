@@ -1,0 +1,130 @@
+# Generated topology: medium tier
+# Switches: 20, Links: 50, VPCs: 2
+# Generated: 2025-10-19T18:09:32Z
+# trigger strict
+
+apiVersion: wiring.githedgehog.com/v1beta1
+kind: Fabric
+metadata:
+  name: perf-test-medium
+  namespace: default
+spec:
+  switches:
+    - name: switch-0001
+      role: leaf
+      asn: 65001
+      ip: 10.0.0.0
+    - name: switch-0002
+      role: leaf
+      asn: 65002
+      ip: 10.0.0.1
+    - name: switch-0003
+      role: leaf
+      asn: 65003
+      ip: 10.0.0.2
+    - name: switch-0004
+      role: leaf
+      asn: 65004
+      ip: 10.0.0.3
+    - name: switch-0005
+      role: leaf
+      asn: 65005
+      ip: 10.0.0.4
+    - name: switch-0006
+      role: leaf
+      asn: 65006
+      ip: 10.0.0.5
+    - name: switch-0007
+      role: leaf
+      asn: 65007
+      ip: 10.0.0.6
+    - name: switch-0008
+      role: leaf
+      asn: 65008
+      ip: 10.0.0.7
+    - name: switch-0009
+      role: leaf
+      asn: 65009
+      ip: 10.0.0.8
+    - name: switch-0010
+      role: spine
+      asn: 65010
+      ip: 10.0.0.9
+    - name: switch-0011
+      role: leaf
+      asn: 65011
+      ip: 10.0.0.10
+    - name: switch-0012
+      role: leaf
+      asn: 65012
+      ip: 10.0.0.11
+    - name: switch-0013
+      role: leaf
+      asn: 65013
+      ip: 10.0.0.12
+    - name: switch-0014
+      role: leaf
+      asn: 65014
+      ip: 10.0.0.13
+    - name: switch-0015
+      role: leaf
+      asn: 65015
+      ip: 10.0.0.14
+    - name: switch-0016
+      role: leaf
+      asn: 65016
+      ip: 10.0.0.15
+    - name: switch-0017
+      role: leaf
+      asn: 65017
+      ip: 10.0.0.16
+    - name: switch-0018
+      role: leaf
+      asn: 65018
+      ip: 10.0.0.17
+    - name: switch-0019
+      role: leaf
+      asn: 65019
+      ip: 10.0.0.18
+    - name: switch-0020
+      role: spine
+      asn: 65020
+      ip: 10.0.0.19
+  links:
+    - from: switch-0001
+      to: switch-0002
+      port: Ethernet2
+    - from: switch-0003
+      to: switch-0004
+      port: Ethernet3
+    - from: switch-0005
+      to: switch-0006
+      port: Ethernet4
+    - from: switch-0007
+      to: switch-0008
+      port: Ethernet5
+    - from: switch-0009
+      to: switch-0010
+      port: Ethernet6
+    - from: switch-0011
+      to: switch-0012
+      port: Ethernet7
+    - from: switch-0013
+      to: switch-0014
+      port: Ethernet8
+    - from: switch-0015
+      to: switch-0016
+      port: Ethernet9
+    - from: switch-0017
+      to: switch-0018
+      port: Ethernet10
+    - from: switch-0019
+      to: switch-0020
+      port: Ethernet11
+  vpcs:
+    - name: vpc-001
+      vni: 10001
+      subnet: 172.16.0.0/24
+    - name: vpc-002
+      vni: 10002
+      subnet: 172.16.0.0/24

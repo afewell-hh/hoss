@@ -1,11 +1,13 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -15,6 +17,15 @@ type DemonClient struct {
 	token      string
 	httpClient *http.Client
 }
+
+// SSEEvent represents a Server-Sent Event from Demon
+type SSEEvent struct {
+	Type string                 `json:"event"`
+	Data map[string]interface{} `json:"data"`
+}
+
+// StreamCallback is called for each SSE event received
+type StreamCallback func(event SSEEvent) error
 
 // RitualStartResponse represents the response from starting a ritual
 type RitualStartResponse struct {
@@ -188,4 +199,126 @@ func (c *DemonClient) WaitForRitual(runID string, timeout time.Duration) (map[st
 	}
 
 	return nil, fmt.Errorf("timeout waiting for ritual to complete")
+}
+
+// StreamRitual subscribes to SSE events for a ritual run
+// Calls callback for each event received (status, envelope, heartbeat)
+// Returns final envelope when completed or error
+func (c *DemonClient) StreamRitual(runID string, timeout time.Duration, callback StreamCallback) (map[string]interface{}, error) {
+	url := fmt.Sprintf("%s/api/v1/runs/%s/stream", c.baseURL, runID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Accept", "text/event-stream")
+	if c.token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+	}
+
+	// Create client with long timeout for streaming
+	streamClient := &http.Client{
+		Timeout: timeout,
+	}
+
+	resp, err := streamClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to stream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("stream error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse SSE stream
+	var finalEnvelope map[string]interface{}
+	scanner := bufio.NewScanner(resp.Body)
+	var currentEvent string
+	var currentData string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// SSE format:
+		// event: <event-type>
+		// data: <json-data>
+		// (empty line)
+
+		if strings.HasPrefix(line, "event: ") {
+			currentEvent = strings.TrimPrefix(line, "event: ")
+		} else if strings.HasPrefix(line, "data: ") {
+			currentData = strings.TrimPrefix(line, "data: ")
+		} else if line == "" && currentEvent != "" && currentData != "" {
+			// End of event, process it
+			var data map[string]interface{}
+			if err := json.Unmarshal([]byte(currentData), &data); err != nil {
+				return nil, fmt.Errorf("failed to parse SSE data: %w", err)
+			}
+
+			event := SSEEvent{
+				Type: currentEvent,
+				Data: data,
+			}
+
+			// Call callback if provided
+			if callback != nil {
+				if err := callback(event); err != nil {
+					return nil, fmt.Errorf("callback error: %w", err)
+				}
+			}
+
+			// Handle different event types
+			switch currentEvent {
+			case "envelope":
+				// Extract envelope from result
+				if result, ok := data["result"]; ok {
+					if resultMap, ok := result.(map[string]interface{}); ok {
+						if resultData, ok := resultMap["data"]; ok {
+							if envMap, ok := resultData.(map[string]interface{}); ok {
+								finalEnvelope = envMap
+							}
+						}
+					}
+				}
+
+			case "status":
+				// Check for completion or failure
+				if status, ok := data["status"].(string); ok {
+					if status == "completed" || status == "success" {
+						// Validation completed
+						if finalEnvelope != nil {
+							return finalEnvelope, nil
+						}
+					} else if status == "failed" || status == "error" {
+						// Validation failed
+						if finalEnvelope != nil {
+							return finalEnvelope, nil
+						}
+						return nil, fmt.Errorf("ritual failed: %s", status)
+					}
+				}
+
+			case "heartbeat":
+				// Keep-alive, no action needed
+			}
+
+			// Reset for next event
+			currentEvent = ""
+			currentData = ""
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("stream error: %w", err)
+	}
+
+	// If we have a final envelope, return it
+	if finalEnvelope != nil {
+		return finalEnvelope, nil
+	}
+
+	return nil, fmt.Errorf("stream ended without completion")
 }
