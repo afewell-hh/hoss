@@ -91,7 +91,7 @@ jobs:
         run: make hossctl-cross
 
       - name: Upload hossctl binaries
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         with:
           name: hossctl-binaries
           path: .artifacts/hossctl/*
@@ -129,7 +129,7 @@ jobs:
           echo "✅ Signed App Pack"
 
       - name: Upload App Pack
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882  # v4.4.3
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4  # v5.0.0
         with:
           name: hoss-app-pack
           path: |
